@@ -1,0 +1,32 @@
+name: Spec bundle
+
+# Rebuilds the completion-spec bundle from the latest @withfig/autocomplete
+# and publishes it as the assets of the rolling "specs" release, which the
+# app polls daily (Sources/Sill/SpecStore.swift). Daily, and on demand.
+on:
+  schedule:
+    - cron: "0 19 * * *" # 19:00 UTC daily (04:00 KST)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the bundle
+        run: ./Scripts/build-specs.sh
+
+      - name: Publish to the rolling "specs" release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if ! gh release view specs > /dev/null 2>&1; then
+            gh release create specs --title "Completion specs" --notes \
+              "Rolling completion-spec bundle (built from @withfig/autocomplete). The app downloads these assets; they are not a Sill release." \
+              --latest=false
+          fi
+          gh release upload specs build/specs.zip build/specs-manifest.json --clobber

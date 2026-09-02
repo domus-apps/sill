@@ -1,0 +1,209 @@
+name: Release
+
+# Publishes a GitHub Release with a zipped Sill.app when a version tag is pushed:
+#   git tag v0.1.0 && git push origin v0.1.0
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    # The package targets macOS 26, so the build needs an Xcode that ships the
+    # macOS 26 SDK — only the macos-26 image has it.
+    runs-on: macos-26
+
+    # The secrets context isn't allowed in step-level `if:`, so expose
+    # presence flags here instead.
+    env:
+      HAVE_CERT: ${{ secrets.DEVELOPER_ID_P12 != '' }}
+      HAVE_NOTARY: ${{ secrets.NOTARY_KEY_P8 != '' }}
+      HAVE_SPARKLE: ${{ secrets.SPARKLE_ED_PRIVATE_KEY != '' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+
+      # Fail before building anything if the version has no changelog entry.
+      # The extracted notes feed both the GitHub release and the appcast.
+      - name: Extract release notes
+        if: github.ref_type == 'tag'
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          # No pipe: the step shell has -e but not pipefail, and a pipe
+          # would let an extraction failure slip through.
+          ./Scripts/changelog-extract.sh "$VERSION" > "$RUNNER_TEMP/notes.md"
+          cat "$RUNNER_TEMP/notes.md"
+          ./Scripts/changelog-extract.sh "$VERSION" CHANGELOG.ko.md > "$RUNNER_TEMP/notes.ko.md"
+          cat "$RUNNER_TEMP/notes.ko.md"
+
+      - name: Run tests
+        run: ./Scripts/test.sh
+
+      - name: Stamp version from tag
+        if: github.ref_type == 'tag'
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" Scripts/Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $GITHUB_RUN_NUMBER" Scripts/Info.plist
+
+      # Signing/notarization activates automatically once the secrets exist
+      # (see README). Without them the build stays ad-hoc signed, as before.
+      - name: Import Developer ID certificate
+        if: env.HAVE_CERT == 'true'
+        env:
+          DEVELOPER_ID_P12: ${{ secrets.DEVELOPER_ID_P12 }}
+          DEVELOPER_ID_P12_PASSWORD: ${{ secrets.DEVELOPER_ID_P12_PASSWORD }}
+        run: |
+          KEYCHAIN="$RUNNER_TEMP/signing.keychain-db"
+          KEYCHAIN_PASSWORD=$(uuidgen)
+          echo "$DEVELOPER_ID_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$RUNNER_TEMP/cert.p12" -P "$DEVELOPER_ID_P12_PASSWORD" \
+            -A -t cert -f pkcs12 -k "$KEYCHAIN"
+          security set-key-partition-list -S apple-tool:,apple: \
+            -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" > /dev/null
+          security list-keychains -d user -s "$KEYCHAIN" login.keychain
+          rm "$RUNNER_TEMP/cert.p12"
+          echo "CODESIGN_IDENTITY=Developer ID Application" >> "$GITHUB_ENV"
+
+      - name: Build app bundle
+        run: ./Scripts/bundle.sh
+
+      - name: Zip app
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent build/Sill.app Sill.zip
+
+      # Requires the cert too: an ad-hoc-signed submission is always rejected.
+      - name: Notarize and staple
+        if: env.HAVE_CERT == 'true' && env.HAVE_NOTARY == 'true'
+        env:
+          NOTARY_KEY_P8: ${{ secrets.NOTARY_KEY_P8 }}
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+        run: |
+          echo "$NOTARY_KEY_P8" > "$RUNNER_TEMP/notary.p8"
+          xcrun notarytool submit Sill.zip \
+            --key "$RUNNER_TEMP/notary.p8" \
+            --key-id "$NOTARY_KEY_ID" \
+            --issuer "$NOTARY_ISSUER_ID" \
+            --wait
+          xcrun stapler staple build/Sill.app
+          spctl -a -t exec -vv build/Sill.app
+          # Re-zip so the release asset contains the stapled ticket.
+          ditto -c -k --sequesterRsrc --keepParent build/Sill.app Sill.zip
+
+      - name: Create GitHub Release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          NOTES_FILE="$RUNNER_TEMP/notes.md"
+          if [[ -z "${CODESIGN_IDENTITY:-}" ]]; then
+            {
+              cat <<'EOF'
+          > [!IMPORTANT]
+          > This build is ad-hoc signed (no Developer ID / notarization), so
+          > Gatekeeper will block the first launch. After unzipping, either
+          > right-click → Open, or run:
+          > `xattr -d com.apple.quarantine Sill.app`
+
+          EOF
+              cat "$RUNNER_TEMP/notes.md"
+            } > "$RUNNER_TEMP/notes-unsigned.md"
+            NOTES_FILE="$RUNNER_TEMP/notes-unsigned.md"
+          fi
+          gh release create "$GITHUB_REF_NAME" "Sill.zip#Sill.app ($VERSION)" \
+            --title "Sill $GITHUB_REF_NAME" \
+            --notes-file "$NOTES_FILE"
+
+      # Publish the update to existing installs: sign the stapled zip with the
+      # Sparkle EdDSA key and append it to the appcast on main. Runs after the
+      # release exists so the enclosure URL never 404s.
+      - name: Update appcast
+        if: github.ref_type == 'tag' && env.HAVE_SPARKLE == 'true'
+        env:
+          SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          curl -sSfL -o "$RUNNER_TEMP/sparkle.tar.xz" \
+            "https://github.com/sparkle-project/Sparkle/releases/download/2.9.6/Sparkle-2.9.6.tar.xz"
+          mkdir -p "$RUNNER_TEMP/sparkle"
+          tar -xf "$RUNNER_TEMP/sparkle.tar.xz" -C "$RUNNER_TEMP/sparkle"
+          SIGNATURE=$(printf '%s' "$SPARKLE_ED_PRIVATE_KEY" \
+            | "$RUNNER_TEMP/sparkle/bin/sign_update" --ed-key-file - Sill.zip)
+          # Render the changelog section to HTML (GitHub's own GFM renderer,
+          # so the update dialog matches the release page) for the appcast
+          # item's description.
+          gh api markdown -f mode=gfm -f text="$(cat "$RUNNER_TEMP/notes.md")" \
+            > "$RUNNER_TEMP/notes.html"
+          gh api markdown -f mode=gfm -f text="$(cat "$RUNNER_TEMP/notes.ko.md")" \
+            > "$RUNNER_TEMP/notes.ko.html"
+          # The checkout is detached at the tag; move to main (discarding the
+          # version-stamp edit) to commit the appcast entry.
+          git fetch origin main
+          git checkout -f -B main origin/main
+          ./Scripts/appcast-add.sh "$VERSION" "$GITHUB_RUN_NUMBER" "$SIGNATURE" \
+            "$RUNNER_TEMP/notes.html" "$RUNNER_TEMP/notes.ko.html"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add appcast.xml
+          git commit -m "Publish v$VERSION to appcast"
+          git push origin main
+
+      # Nudge the suite bundle (Domus.zip) to rebuild with this release.
+      # Needs the SUITE_DISPATCH_TOKEN org secret (a PAT that can send
+      # repository_dispatch to domus-apps/suite); without it the daily
+      # scheduled rebuild still picks the release up.
+      - name: Notify the suite bundle
+        if: github.ref_type == 'tag'
+        env:
+          DISPATCH_TOKEN: ${{ secrets.SUITE_DISPATCH_TOKEN }}
+        run: |
+          if [ -z "$DISPATCH_TOKEN" ]; then
+            echo "SUITE_DISPATCH_TOKEN not set; the scheduled bundle rebuild will pick this up."
+            exit 0
+          fi
+          curl -sf -X POST \
+            -H "Authorization: Bearer $DISPATCH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/domus-apps/suite/dispatches \
+            -d '{"event_type":"app-release"}'
+
+      # Nudge the website to refresh its cached version labels and
+      # changelog right away (they otherwise refresh hourly). Needs the
+      # REVALIDATE_SECRET org secret; without it (or on failure) the
+      # hourly cache still catches up on its own.
+      - name: Refresh the website's release data
+        if: github.ref_type == 'tag'
+        env:
+          REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
+        run: |
+          if [ -z "$REVALIDATE_SECRET" ]; then
+            echo "REVALIDATE_SECRET not set; the hourly cache will catch up."
+            exit 0
+          fi
+          curl -sf -X POST \
+            "https://domus-apps.com/api/revalidate?secret=$REVALIDATE_SECRET" \
+            || echo "revalidate ping failed; the hourly cache will catch up."
+
+      # For manual (workflow_dispatch) runs, keep the app as a build artifact
+      # instead of publishing a release.
+      - name: Upload artifact
+        if: github.ref_type != 'tag'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sill.app
+          path: Sill.zip
