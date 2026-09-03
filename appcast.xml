@@ -35,5 +35,39 @@
         sparkle:edSignature="idt0Ay2gcWZ2iIN9NZlmiVAyzA2Y4fk9fQ5CG/4kMDOZDXU6YeG10x20fa4Jj2yJm4nSExjdvBrT8H9PzOdyDA==" length="3085090"
         type="application/octet-stream"/>
     </item>
+    <item>
+      <title>Sill v1.1.0</title>
+      <link>https://github.com/domus-apps/sill/releases/tag/v1.1.0</link>
+      <pubDate>Thu, 03 Sep 2026 05:11:45 +0000</pubDate>
+      <description xml:lang="en"><![CDATA[
+<ul>
+<li>Ghostty and cmux now get completions too, alongside Terminal.app, iTerm2 and VS Code.</li>
+<li>Commands the definitions don't cover can now be learned from their own help text — switch it on under Specs in Settings, and only real programs are ever run.</li>
+<li>Completing a word no longer leaves a space behind it, and the list closes so your next keystroke goes straight to the shell.</li>
+<li>When what you typed is already the whole word, Return runs the command instead of completing it.</li>
+<li>The list lines up with your cursor the same way in every terminal now.</li>
+<li>Arrowing to the top or bottom of a long list keeps the highlighted row clear of the edge instead of tucking it under.</li>
+<li>Fixed the stray characters that could appear at your prompt when a terminal answered slowly.</li>
+<li>Fixed the pale corners that showed around the popup.</li>
+</ul>      ]]></description>
+      <description xml:lang="ko"><![CDATA[
+<ul>
+<li>Ghostty와 cmux에서도 자동완성이 뜹니다. Terminal.app, iTerm2, VS Code에 이어서요.</li>
+<li>정의가 없는 명령도 그 명령의 도움말을 읽어 익힐 수 있습니다. 설정의 Specs에서 켜면 되고, 실제 프로그램만 실행합니다.</li>
+<li>자동완성한 뒤에 공백이 붙지 않고, 목록이 닫혀 다음에 누르는 키가 곧바로 셸로 갑니다.</li>
+<li>이미 단어를 끝까지 입력했다면 Return이 자동완성 대신 명령을 실행합니다.</li>
+<li>어느 터미널에서든 목록이 커서와 같은 방식으로 정렬됩니다.</li>
+<li>긴 목록의 처음이나 끝으로 이동해도 선택한 항목이 가장자리에 붙지 않습니다.</li>
+<li>터미널이 늦게 응답할 때 프롬프트에 이상한 문자가 찍히던 문제를 고쳤습니다.</li>
+<li>팝업 모서리에 옅은 자국이 보이던 문제를 고쳤습니다.</li>
+</ul>      ]]></description>
+      <sparkle:version>2</sparkle:version>
+      <sparkle:shortVersionString>1.1.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <enclosure
+        url="https://github.com/domus-apps/sill/releases/download/v1.1.0/Sill.zip"
+        sparkle:edSignature="rd5p64aEwvBXJPSVYNZNP3T5Yc34jlxTc0lOYr1kGYZM/f5x2hhQ/vQTT1SdPtp6390njwZhBuPs8ryWBC3SAw==" length="3161141"
+        type="application/octet-stream"/>
+    </item>
   </channel>
 </rss>
