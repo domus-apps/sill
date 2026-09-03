@@ -8,44 +8,6 @@
     <item>
       <title>Sill v1.0.0</title>
       <link>https://github.com/domus-apps/sill/releases/tag/v1.0.0</link>
-      <pubDate>Sun, 30 Aug 2026 14:35:38 +0000</pubDate>
-      <description><![CDATA[
-<p>The first release.</p>
-<ul>
-<li>A volume slider and mute for every app, right in the menu bar — the one control macOS never shipped.</li>
-<li>Built on Core Audio process taps: no drivers, no kernel extensions, nothing to install beyond the app.</li>
-<li>Apps at full volume are untouched — their audio passes straight through the system as if Sill weren't running.</li>
-<li>Chrome- and Electron-style helper processes are grouped under the app you actually see.</li>
-<li>Volumes are remembered per app and reapplied when the app plays again, across relaunches.</li>
-<li>Follows the default output everywhere: switch to AirPods mid-song and the levels come along.</li>
-</ul>      ]]></description>
-      <sparkle:version>1</sparkle:version>
-      <sparkle:shortVersionString>1.0.0</sparkle:shortVersionString>
-      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-      <enclosure
-        url="https://github.com/domus-apps/sill/releases/download/v1.0.0/Sill.zip"
-        sparkle:edSignature="poaT7yIvTHQ2IKqEn7piqddXuuX0lR1NcaDsL6/WZPgBUA7ezjrA10CNEEPAWq1vpSF4VzThLEGINZYiotRRAQ==" length="3138505"
-        type="application/octet-stream"/>
-    </item>
-    <item>
-      <title>Sill v1.0.1</title>
-      <link>https://github.com/domus-apps/sill/releases/tag/v1.0.1</link>
-      <pubDate>Sun, 30 Aug 2026 14:46:56 +0000</pubDate>
-      <description><![CDATA[
-<ul>
-<li>Tightened the gap between the volume sliders and the menu items below them.</li>
-</ul>      ]]></description>
-      <sparkle:version>2</sparkle:version>
-      <sparkle:shortVersionString>1.0.1</sparkle:shortVersionString>
-      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
-      <enclosure
-        url="https://github.com/domus-apps/sill/releases/download/v1.0.1/Sill.zip"
-        sparkle:edSignature="n2Q69Wkqd6AwPfBHWz2uHmF9/PSSlNCwqIVCgfLXdvLx5Sdupym1B8Hc1XDT2qxSqsPpK9sK7TNOY5HMsgk6CQ==" length="3138530"
-        type="application/octet-stream"/>
-    </item>
-    <item>
-      <title>Sill v1.0.0</title>
-      <link>https://github.com/domus-apps/sill/releases/tag/v1.0.0</link>
       <pubDate>Wed, 02 Sep 2026 23:56:55 +0000</pubDate>
       <description xml:lang="en"><![CDATA[
 <ul>
