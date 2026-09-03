@@ -99,5 +99,33 @@
         sparkle:edSignature="JC3jUKIV9ba1ZuWG1RTZFj92hdTWn6u4IbFSt5eKwXy+MJnW9VeRMnEOCcD70/Fe2P1sBs060heEPyzTFU0KBw==" length="3190169"
         type="application/octet-stream"/>
     </item>
+    <item>
+      <title>Sill v1.3.0</title>
+      <link>https://github.com/domus-apps/sill/releases/tag/v1.3.0</link>
+      <pubDate>Thu, 03 Sep 2026 13:17:46 +0000</pubDate>
+      <description xml:lang="en"><![CDATA[
+<ul>
+<li>Splitting a pane or resizing the window no longer throws the popup off: it finds the caret again on the very next keystroke, with no Enter needed.</li>
+<li>Clearing the screen with ⌘K is handled the same way.</li>
+<li>Fixed a runaway where stray terminal replies could flood the prompt with text until you pressed ^C.</li>
+<li>In Ghostty the popup now follows the caret from the screen itself, so a wrapped line above the prompt no longer shifts it.</li>
+<li>A terminal that answers its first query slowly, like a freshly opened pane, now gets a full second instead of losing the whole first line.</li>
+</ul>      ]]></description>
+      <description xml:lang="ko"><![CDATA[
+<ul>
+<li>pane을 나누거나 창 크기를 바꿔도 팝업이 어긋나지 않습니다. 다음 키 입력에서 바로 커서를 다시 찾으며, Enter를 칠 필요가 없습니다.</li>
+<li>⌘K로 화면을 지운 뒤에도 같은 방식으로 맞춥니다.</li>
+<li>터미널 응답이 프롬프트에 글자로 새어 들어와 ^C를 누를 때까지 반복되던 문제를 고쳤습니다.</li>
+<li>Ghostty에서는 화면 자체에서 커서를 읽어, 프롬프트 위의 줄바꿈된 줄 때문에 팝업이 밀리지 않습니다.</li>
+<li>새로 연 pane처럼 첫 응답이 느린 터미널에도 1초를 기다려 첫 줄을 놓치지 않습니다.</li>
+</ul>      ]]></description>
+      <sparkle:version>4</sparkle:version>
+      <sparkle:shortVersionString>1.3.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <enclosure
+        url="https://github.com/domus-apps/sill/releases/download/v1.3.0/Sill.zip"
+        sparkle:edSignature="YbGcJ4EpxBO7WT8jIjMOYDQyuXTgvb87ANtYZhT9P7AtzeX1ljPBoIHLxMusrEHqJlF6g/mjwRzmd9hxQvmrBA==" length="3201462"
+        type="application/octet-stream"/>
+    </item>
   </channel>
 </rss>
