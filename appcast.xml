@@ -69,5 +69,35 @@
         sparkle:edSignature="rd5p64aEwvBXJPSVYNZNP3T5Yc34jlxTc0lOYr1kGYZM/f5x2hhQ/vQTT1SdPtp6390njwZhBuPs8ryWBC3SAw==" length="3161141"
         type="application/octet-stream"/>
     </item>
+    <item>
+      <title>Sill v1.2.0</title>
+      <link>https://github.com/domus-apps/sill/releases/tag/v1.2.0</link>
+      <pubDate>Thu, 03 Sep 2026 06:08:26 +0000</pubDate>
+      <description xml:lang="en"><![CDATA[
+<ul>
+<li>Sill now speaks Korean: Settings, onboarding and the menu follow your system language.</li>
+<li>Type the first letter and Sill can offer the command itself, with a line on what it does — switch on "Complete command names" in Settings.</li>
+<li>Matching is fuzzy now: "chk" finds checkout and "rb" finds rebase, and the letters that matched are shown in the list. Exact and prefix matches still come first.</li>
+<li>After completing a word, your terminal's syntax highlighting updates right away instead of leaving it half-coloured.</li>
+<li>The list's icons no longer change with your system language.</li>
+<li>The "Check for Updates" button in Settings is its own size again.</li>
+</ul>      ]]></description>
+      <description xml:lang="ko"><![CDATA[
+<ul>
+<li>Sill이 한국어를 지원합니다. 설정, 온보딩, 메뉴가 시스템 언어를 따릅니다.</li>
+<li>첫 글자만 입력해도 명령 자체를 설명과 함께 제안할 수 있습니다. 설정에서 "명령 이름 자동완성"을 켜세요.</li>
+<li>검색이 유연해졌습니다. "chk"로 checkout을, "rb"로 rebase를 찾고, 일치한 글자가 목록에 표시됩니다. 정확히 맞는 항목은 여전히 먼저 옵니다.</li>
+<li>단어를 자동완성한 뒤 터미널의 구문 강조가 곧바로 갱신됩니다. 반쯤만 색칠된 채 남던 문제가 사라졌습니다.</li>
+<li>목록의 아이콘이 시스템 언어에 따라 바뀌지 않습니다.</li>
+<li>설정의 "업데이트 확인" 버튼이 제 크기로 돌아왔습니다.</li>
+</ul>      ]]></description>
+      <sparkle:version>3</sparkle:version>
+      <sparkle:shortVersionString>1.2.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <enclosure
+        url="https://github.com/domus-apps/sill/releases/download/v1.2.0/Sill.zip"
+        sparkle:edSignature="JC3jUKIV9ba1ZuWG1RTZFj92hdTWn6u4IbFSt5eKwXy+MJnW9VeRMnEOCcD70/Fe2P1sBs060heEPyzTFU0KBw==" length="3190169"
+        type="application/octet-stream"/>
+    </item>
   </channel>
 </rss>
