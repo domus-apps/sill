@@ -8,12 +8,15 @@ import Foundation
 enum ShellMessage: Equatable {
     /// `dark` is the terminal's own background (from the plugin's OSC 11
     /// query), nil when the terminal didn't answer.
-    case hello(sid: String, pid: Int32, tty: String, term: String, dark: Bool?)
+    /// `path` is the shell's $PATH, for resolving commands to learn from.
+    case hello(sid: String, pid: Int32, tty: String, term: String, dark: Bool?, path: String?)
     /// The edit buffer as of this keystroke. `row`/`col` anchor the START of
-    /// the buffer (the cell where the prompt ends, from the plugin's CPR
-    /// query); the caret cell is derived from `cur` and `cols`.
+    /// the buffer (the cell where the prompt ends) and `grid` carries the
+    /// terminal's pixel geometry — both only from terminals the plugin
+    /// queries itself (Ghostty, cmux), see GridInfo; the caret cell is
+    /// derived from `cur` and `cols`.
     case buffer(sid: String, buf: String, cur: Int, pwd: String,
-                row: Int, col: Int, cols: Int, rows: Int)
+                row: Int, col: Int, cols: Int, rows: Int, grid: GridInfo?)
     /// A steering key the plugin consumed while the popup was up ("tab",
     /// "up", "down", "ret", "esc"). ZLE receives keys regardless of Secure
     /// Keyboard Entry — the shell is the legitimate recipient — which is
@@ -23,7 +26,7 @@ enum ShellMessage: Equatable {
 
     var sid: String {
         switch self {
-        case .hello(let sid, _, _, _, _), .buffer(let sid, _, _, _, _, _, _, _),
+        case .hello(let sid, _, _, _, _, _), .buffer(let sid, _, _, _, _, _, _, _, _),
              .key(let sid, _), .end(let sid):
             return sid
         }
@@ -41,17 +44,26 @@ enum ShellMessage: Equatable {
             return .hello(sid: sid, pid: Int32(pid),
                           tty: dict["tty"] as? String ?? "",
                           term: dict["term"] as? String ?? "",
-                          dark: dict["dark"] as? Bool)
+                          dark: dict["dark"] as? Bool,
+                          path: dict["path"] as? String)
         case "buf":
             guard let buf = dict["buf"] as? String,
                   let cur = dict["cur"] as? Int,
                   let pwd = dict["pwd"] as? String
             else { return nil }
+            var grid: GridInfo?
+            if let cellW = dict["cellw"] as? Int, let cellH = dict["cellh"] as? Int,
+               cellW > 0, cellH > 0 {
+                grid = GridInfo(cellPixels: CGSize(width: cellW, height: cellH),
+                                textPixels: CGSize(width: dict["tw"] as? Int ?? 0,
+                                                   height: dict["th"] as? Int ?? 0))
+            }
             return .buffer(sid: sid, buf: buf, cur: cur, pwd: pwd,
                            row: dict["row"] as? Int ?? 1,
                            col: dict["col"] as? Int ?? 1,
                            cols: dict["cols"] as? Int ?? 80,
-                           rows: dict["rows"] as? Int ?? 24)
+                           rows: dict["rows"] as? Int ?? 24,
+                           grid: grid)
         case "key":
             guard let key = dict["key"] as? String else { return nil }
             return .key(sid: sid, key: key)
@@ -61,6 +73,15 @@ enum ShellMessage: Equatable {
             return nil
         }
     }
+}
+
+/// Pixel geometry a terminal reported to the plugin (XTWINOPS 16 and 14):
+/// the size of one cell and of the whole text area, in device pixels.
+/// Terminals without an accessibility caret (Ghostty, cmux) are positioned
+/// against this plus the terminal view's frame.
+struct GridInfo: Equatable {
+    var cellPixels: CGSize
+    var textPixels: CGSize
 }
 
 /// App → shell: whether the popup is on screen (the plugin binds/unbinds

@@ -21,6 +21,14 @@ struct Suggestion: Equatable {
     var score: Int = 0
 }
 
+extension Suggestion {
+    /// True when the word before the caret already IS this suggestion:
+    /// accepting it would replace those characters with themselves.
+    func insertsNothing(before caretPrefix: String) -> Bool {
+        deleteCount == insertText.count && caretPrefix.hasSuffix(insertText)
+    }
+}
+
 /// A shell word with its position in the buffer.
 struct Token: Equatable {
     var text: String
@@ -126,6 +134,12 @@ struct CompletionResult {
     /// The simple command's tokens, partial included — generator scripts and
     /// postProcess functions receive these.
     var commandTokens: [String] = []
+    /// The first word of a command no spec covers, as typed — a candidate
+    /// for learning from `--help` (DerivedSpecStore).
+    var unknownCommand: String? = nil
+    /// A learned spec's subcommand the user has reached whose own options
+    /// haven't been read yet: root command name, then subcommand names.
+    var unexploredPath: [String]? = nil
 }
 
 /* Walks a buffer prefix against a Fig spec tree and produces ranked
@@ -136,34 +150,46 @@ struct CompletionParser {
     /// Picks the user made before, per command — orders equal matches.
     var recency: RecencyStore? = nil
 
-    func complete(buffer: String, cursor: Int) -> CompletionResult {
-        let prefix = String(buffer.prefix(cursor))
+    /// The simple command under the caret: the rightmost command of a
+    /// pipeline/list, minus leading environment assignments and wrappers
+    /// (`sudo`, `env`, …), which change nothing about its completions.
+    static func commandTokens(of prefix: String) -> [Token] {
         var tokens = Tokenizer.tokenize(prefix)
-
-        // Complete only the rightmost simple command of a pipeline/list.
         if let lastSeparator = tokens.lastIndex(where: { $0.isSeparator }) {
             tokens = Array(tokens[(lastSeparator + 1)...])
         }
-        // Leading environment assignments and wrappers change nothing about
-        // the command's own completions.
         let wrappers: Set<String> = ["sudo", "env", "command", "builtin", "nohup", "time", "exec"]
         while let first = tokens.first, tokens.count > 1,
               first.text.contains("=") || wrappers.contains(first.text) {
             tokens.removeFirst()
         }
+        return tokens
+    }
+
+    func complete(buffer: String, cursor: Int) -> CompletionResult {
+        let prefix = String(buffer.prefix(cursor))
+        var tokens = Self.commandTokens(of: prefix)
 
         guard tokens.count >= 2 else { return CompletionResult(suggestions: []) }
         let commandName = (tokens[0].text as NSString).lastPathComponent
         guard let root = engine.spec(for: commandName) else {
-            return CompletionResult(suggestions: [])
+            return CompletionResult(suggestions: [], unknownCommand: tokens[0].text)
         }
 
         let commandTokens = tokens.map(\.text)
         let partial = tokens.removeLast()
         var node = root
+        var walked = [commandName]
         var argsOnly = false
         var argIndex = 0
         var pendingOptionArg: SpecNode?
+        /// Stamps the fields every outcome shares.
+        func finished(_ result: CompletionResult) -> CompletionResult {
+            var result = result
+            result.commandTokens = commandTokens
+            result.unexploredPath = node.needsExploration ? walked : nil
+            return result
+        }
 
         for token in tokens.dropFirst() {
             if argsOnly {
@@ -190,6 +216,7 @@ struct CompletionParser {
             }
             if argIndex == 0,
                let sub = node.subcommands.first(where: { $0.names.contains(token.text) }) {
+                walked.append(sub.primaryName)
                 // Big CLIs split subtrees into separate files ("aws/s3").
                 if let name = sub.loadSpecName, let loaded = engine.spec(for: name) {
                     node = loaded
@@ -208,9 +235,7 @@ struct CompletionParser {
 
         // What can the partial token be?
         if let pending = pendingOptionArg {
-            var result = argSuggestions(for: pending, partial: partial, command: commandName)
-            result.commandTokens = commandTokens
-            return result
+            return finished(argSuggestions(for: pending, partial: partial, command: commandName))
         }
         if partial.text.hasPrefix("-"), !argsOnly {
             /* One row per option, named by the alias the partial matches
@@ -227,9 +252,8 @@ struct CompletionParser {
                                   aliases: option.names.filter { $0 != name },
                                   priority: option.priority)
             }
-            return CompletionResult(suggestions: rank(options, partial: partial.text,
-                                                      command: commandName),
-                                    commandTokens: commandTokens)
+            return finished(CompletionResult(
+                suggestions: rank(options, partial: partial.text, command: commandName)))
         }
 
         var suggestions: [Suggestion] = []
@@ -257,19 +281,17 @@ struct CompletionParser {
             let argResult = argSuggestions(for: arg, partial: partial, command: commandName)
             suggestions += argResult.suggestions
             let ranked = rank(suggestions, partial: partial.text, command: commandName)
-            return CompletionResult(suggestions: ranked, pendingArg: argResult.pendingArg,
-                                    commandTokens: commandTokens)
+            return finished(CompletionResult(suggestions: ranked, pendingArg: argResult.pendingArg))
         }
-        return CompletionResult(suggestions: rank(suggestions, partial: partial.text,
-                                                  command: commandName),
-                                commandTokens: commandTokens)
+        return finished(CompletionResult(
+            suggestions: rank(suggestions, partial: partial.text, command: commandName)))
     }
 
     private func argSuggestions(for arg: SpecNode, partial: Token,
                                 command: String) -> CompletionResult {
         var suggestions = arg.staticSuggestions.map { entry in
             Suggestion(display: entry.name,
-                       insertText: (entry.insertValue.map(Self.stripCursorMark) ?? entry.name) + " ",
+                       insertText: entry.insertValue.map(Self.stripCursorMark) ?? entry.name,
                        deleteCount: partial.typedLength,
                        detail: entry.description,
                        kind: .argument)
@@ -282,12 +304,13 @@ struct CompletionParser {
         return CompletionResult(suggestions: suggestions, pendingArg: pending)
     }
 
+    /* Insertions end exactly where the word ends — no trailing space. The
+       word is what was chosen; whether a space, an `=`, or Return comes
+       next is the user's call (the controller keeps the popup down until
+       the buffer moves on, so the completed word isn't offered again). */
     private func insertText(for node: SpecNode, name: String) -> String {
         if let insert = node.insertValue { return Self.stripCursorMark(insert) }
-        // A trailing space moves straight to the next word — except when the
-        // option expects `=`-joined values often enough that fig marks it
-        // via requiresSeparator (rare; skipped in v1).
-        return name + " "
+        return name
     }
 
     /// Which of a node's aliases to surface: with nothing typed, the longest

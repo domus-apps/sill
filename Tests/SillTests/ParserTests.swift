@@ -70,7 +70,7 @@ struct SpyEngine: SpecProviding {
 @Test func suggestsSubcommandsByPrefix() {
     let result = makeParser().complete(buffer: "git ch", cursor: 6)
     #expect(result.suggestions.map(\.display) == ["checkout", "cherry-pick"])
-    #expect(result.suggestions[0].insertText == "checkout ")
+    #expect(result.suggestions[0].insertText == "checkout")
     #expect(result.suggestions[0].deleteCount == 2)
     #expect(result.suggestions[0].kind == .subcommand)
 }
@@ -92,7 +92,7 @@ struct SpyEngine: SpecProviding {
     // Typing the short alias surfaces and completes it.
     let short = makeParser().complete(buffer: "git pi", cursor: 6).suggestions
     #expect(short.map(\.display) == ["pick"])
-    #expect(short.first?.insertText == "pick ")
+    #expect(short.first?.insertText == "pick")
     // When several aliases match, the canonical (longest) one is shown.
     #expect(CompletionParser.preferredName(["i", "install"], matching: "i") == "install")
     #expect(CompletionParser.preferredName(["a", "add"], matching: "") == "add")
@@ -212,4 +212,26 @@ struct SpyEngine: SpecProviding {
     #expect(recency.sorted(items, command: "cd").map(\.display) == ["b", "c", "a", "d"])
     // Scoped per command: another command's picks don't leak.
     #expect(recency.sorted(items, command: "ls").map(\.display) == ["a", "b", "c", "d"])
+}
+
+// MARK: - A finished word offers nothing
+
+@Test func aFullyTypedSuggestionInsertsNothing() {
+    let parser = makeParser()
+
+    // "git checkout" — the only match is the word already typed.
+    let done = parser.complete(buffer: "git checkout", cursor: 12)
+    #expect(done.suggestions.map(\.display) == ["checkout"])
+    #expect(done.suggestions[0].insertsNothing(before: "git checkout"))
+
+    // One character short, it still has something to insert.
+    let partial = parser.complete(buffer: "git checkou", cursor: 11)
+    #expect(partial.suggestions[0].insertsNothing(before: "git checkou") == false)
+
+    // An alias typed in full still shows the canonical name beside it and
+    // inserts that — not a no-op.
+    let alias = parser.complete(buffer: "git pick", cursor: 8)
+    #expect(alias.suggestions[0].display == "pick")
+    #expect(alias.suggestions[0].aliases == ["cherry-pick"])
+    #expect(alias.suggestions[0].insertsNothing(before: "git pick"))
 }

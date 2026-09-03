@@ -42,7 +42,7 @@ enum TemplateResolver {
             let escaped = shellEscaped(directoryPrefix + name)
             return Suggestion(
                 display: name + (isDirectory ? "/" : ""),
-                insertText: escaped + (isDirectory ? "/" : " "),
+                insertText: escaped + (isDirectory ? "/" : ""),
                 deleteCount: partial.typedLength,
                 detail: "",
                 kind: isDirectory ? .folder : .file,
@@ -191,7 +191,7 @@ final class GeneratorRunner {
     private func makeSuggestion(_ name: String, detail: String, insertValue: String?,
                                 partial: Token) -> Suggestion {
         let insert = insertValue.map(CompletionParser.stripCursorMark)
-            ?? TemplateResolver.shellEscaped(name) + " "
+            ?? TemplateResolver.shellEscaped(name)
         return Suggestion(display: name, insertText: insert,
                           deleteCount: partial.typedLength, detail: detail, kind: .argument)
     }
@@ -280,7 +280,7 @@ final class GeneratorRunner {
             if element.isString {
                 let name = element.toString() ?? ""
                 suggestions.append(Suggestion(
-                    display: name, insertText: TemplateResolver.shellEscaped(name) + " ",
+                    display: name, insertText: TemplateResolver.shellEscaped(name),
                     deleteCount: deleteCount, detail: "", kind: .argument))
                 continue
             }

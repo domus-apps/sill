@@ -21,16 +21,23 @@ import Testing
 @Test func decodesTheThreeMessageTypes() {
     let hello = ShellMessage.decode(Data(
         #"{"t":"hello","v":1,"sid":"1-2","pid":42,"tty":"/dev/ttys004","term":"iTerm.app"}"#.utf8))
-    #expect(hello == .hello(sid: "1-2", pid: 42, tty: "/dev/ttys004", term: "iTerm.app", dark: nil))
+    #expect(hello == .hello(sid: "1-2", pid: 42, tty: "/dev/ttys004", term: "iTerm.app", dark: nil, path: nil))
 
     let darkHello = ShellMessage.decode(Data(
         #"{"t":"hello","v":1,"sid":"1-2","pid":42,"tty":"/dev/ttys004","term":"Apple_Terminal","dark":true}"#.utf8))
-    #expect(darkHello == .hello(sid: "1-2", pid: 42, tty: "/dev/ttys004", term: "Apple_Terminal", dark: true))
+    #expect(darkHello == .hello(sid: "1-2", pid: 42, tty: "/dev/ttys004", term: "Apple_Terminal", dark: true, path: nil))
 
     let buf = ShellMessage.decode(Data(
         #"{"t":"buf","sid":"1-2","buf":"git ch","cur":6,"pwd":"/x","row":3,"col":5,"cols":80,"rows":24}"#.utf8))
     #expect(buf == .buffer(sid: "1-2", buf: "git ch", cur: 6, pwd: "/x",
-                           row: 3, col: 5, cols: 80, rows: 24))
+                           row: 3, col: 5, cols: 80, rows: 24, grid: nil))
+
+    // Grid terminals (Ghostty, cmux) add the pixel geometry they measured.
+    let gridBuf = ShellMessage.decode(Data(
+        #"{"t":"buf","sid":"1-2","buf":"","cur":0,"pwd":"/x","cols":80,"rows":24,"row":4,"col":3,"cellw":16,"cellh":34,"tw":1280,"th":816}"#.utf8))
+    #expect(gridBuf == .buffer(sid: "1-2", buf: "", cur: 0, pwd: "/x", row: 4, col: 3, cols: 80, rows: 24,
+                               grid: GridInfo(cellPixels: CGSize(width: 16, height: 34),
+                                              textPixels: CGSize(width: 1280, height: 816))))
 
     #expect(ShellMessage.decode(Data(#"{"t":"end","sid":"1-2"}"#.utf8)) == .end(sid: "1-2"))
 }

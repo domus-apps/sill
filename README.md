@@ -26,6 +26,14 @@ Dynamic suggestions (git branches, npm scripts) come from short shell
 commands the completion definitions specify, run locally in the session's
 working directory with a timeout.
 
+The upstream corpus stopped updating in 2025, so Sill layers its own
+definitions on top ([Specs/overrides](Specs/overrides/README.md)) and, if you
+turn it on in Settings, learns commands the corpus doesn't know from their
+own `--help` output: the program is run once, in the background, with a
+quiet environment and a timeout, and what it prints is kept as a local
+definition on your Mac. Only real programs are run — a shell script found in
+your PATH is never executed for this.
+
 Steering keys (Tab, arrows, Return, Esc) are handled by the same shell
 integration, as line-editor bindings active only while the popup is on
 screen — nothing observes the keyboard at the system level, so they work
@@ -35,7 +43,10 @@ the popup.
 
 ## Limitations
 
-- zsh only, in Terminal.app, iTerm2, and VS Code's integrated terminal, for now.
+- zsh only, in Terminal.app, iTerm2, VS Code's integrated terminal, Ghostty
+  and cmux, for now. Ghostty and cmux expose no caret to accessibility, so
+  the popup is placed from the cell grid the terminal reports — a nudge off
+  when the prompt uses glyphs whose width the shell misjudges.
 - Over ssh, inside tmux, and in full-screen TUIs Sill stays out of the way
   automatically.
 

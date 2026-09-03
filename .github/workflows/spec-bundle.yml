@@ -1,11 +1,18 @@
 name: Spec bundle
 
-# Rebuilds the completion-spec bundle from the latest @withfig/autocomplete
-# and publishes it as the assets of the rolling "specs" release, which the
-# app polls daily (Sources/Sill/SpecStore.swift). Daily, and on demand.
+# Rebuilds the completion-spec bundle — upstream @withfig/autocomplete plus
+# Specs/overrides — and publishes it as the assets of the rolling "specs"
+# release, which the app polls daily (Sources/Sill/SpecStore.swift).
+# Upstream has been quiet since May 2025, so a weekly rebuild is plenty;
+# changes to the overrides publish right away.
 on:
   schedule:
-    - cron: "0 19 * * *" # 19:00 UTC daily (04:00 KST)
+    - cron: "0 19 * * 1" # Mondays 19:00 UTC (04:00 KST Tuesday)
+  push:
+    branches: [main]
+    paths:
+      - "Specs/**"
+      - "Scripts/build-specs.sh"
   workflow_dispatch:
 
 permissions:
@@ -26,7 +33,7 @@ jobs:
         run: |
           if ! gh release view specs > /dev/null 2>&1; then
             gh release create specs --title "Completion specs" --notes \
-              "Rolling completion-spec bundle (built from @withfig/autocomplete). The app downloads these assets; they are not a Sill release." \
+              "Rolling completion-spec bundle (built from @withfig/autocomplete plus Specs/overrides). The app downloads these assets; they are not a Sill release." \
               --latest=false
           fi
           gh release upload specs build/specs.zip build/specs-manifest.json --clobber

@@ -13,6 +13,11 @@ final class PopupPanel {
     private static let rowHeight: CGFloat = 22
     private static let maxVisibleRows = 9
     private static let width: CGFloat = 360
+    private static let cornerRadius: CGFloat = 8
+    /* The gap between the panel's edge and a row's highlight. The popup is
+       placed this far left of the caret so the highlight — not the panel's
+       edge — lines up with what is being typed. */
+    static let contentInset: CGFloat = 6
 
     var isVisible: Bool { panel.isVisible }
     /// True once the user has moved the selection with the arrow keys —
@@ -23,7 +28,6 @@ final class PopupPanel {
         guard model.suggestions.indices.contains(model.selectedIndex) else { return nil }
         return model.suggestions[model.selectedIndex]
     }
-
 
     init() {
         panel = NSPanel(
@@ -36,6 +40,12 @@ final class PopupPanel {
         panel.collectionBehavior = [.fullScreenAuxiliary, .transient, .ignoresCycle]
         panel.isOpaque = false
         panel.backgroundColor = .clear
+        /* The window-server shadow is what gives the card its native menu
+           edge (a hairline rim along the rounded outline). It is computed
+           from the window's alpha, so the content must be truly rounded —
+           see maskImage below — and it is recomputed after every resize
+           (invalidateShadow in show/move), or a stale square shadow lingers
+           at the corners. */
         panel.hasShadow = true
         panel.becomesKeyOnlyIfNeeded = true
 
@@ -43,8 +53,13 @@ final class PopupPanel {
         effect.material = .menu
         effect.state = .active
         effect.blendingMode = .behindWindow
+        /* The behind-window blur takes its shape from maskImage, not from
+           the layer's corner radius — without this the blur is a rectangle
+           whose corners peek out past the rounded card. */
+        effect.maskImage = Self.roundedMask(radius: Self.cornerRadius)
         effect.wantsLayer = true
-        effect.layer?.cornerRadius = 8
+        effect.layer?.cornerRadius = Self.cornerRadius
+        effect.layer?.cornerCurve = .continuous
         effect.layer?.masksToBounds = true
 
         let hosting = NSHostingView(rootView: PopupListView(model: model) { [weak self] suggestion in
@@ -59,6 +74,27 @@ final class PopupPanel {
             hosting.bottomAnchor.constraint(equalTo: effect.bottomAnchor),
         ])
         panel.contentView = effect
+    }
+
+    /// A stretchable rounded-rect alpha mask for the visual effect view.
+    private static func roundedMask(radius: CGFloat) -> NSImage {
+        let edge = radius * 2 + 1
+        let image = NSImage(size: NSSize(width: edge, height: edge), flipped: false) { rect in
+            NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius).fill()
+            return true
+        }
+        image.capInsets = NSEdgeInsets(top: radius, left: radius, bottom: radius, right: radius)
+        image.resizingMode = .stretch
+        return image
+    }
+
+    /// The window server snapshots the shadow shape lazily; after a resize
+    /// the old (square-cornered) one can persist. Ask for a fresh one once
+    /// the new frame has been drawn.
+    private func refreshShadow() {
+        DispatchQueue.main.async { [panel] in
+            panel.invalidateShadow()
+        }
     }
 
     /// Shows (or repositions) the popup under `caret`, flipping above when
@@ -86,13 +122,14 @@ final class PopupPanel {
                               size: CGSize(width: Self.width, height: height)),
                        display: true)
         panel.orderFrontRegardless()
+        refreshShadow()
     }
 
     /// Below the caret line, flipped above it when the screen edge is in the
     /// way, and kept within the screen horizontally.
     private func origin(for placement: CaretLocator.Placement, height: CGFloat) -> CGPoint {
         let caret = placement.rect
-        var origin = CGPoint(x: caret.minX, y: caret.minY - height - 4)
+        var origin = CGPoint(x: caret.minX - Self.contentInset, y: caret.minY - height - 4)
         let screen = NSScreen.screens.first(where: { $0.frame.contains(caret.origin) })
             ?? NSScreen.main
         if let visible = screen?.visibleFrame {
@@ -109,6 +146,7 @@ final class PopupPanel {
     func move(to placement: CaretLocator.Placement) {
         guard panel.isVisible else { return }
         panel.setFrameOrigin(origin(for: placement, height: panel.frame.height))
+        refreshShadow()
     }
 
     func hide() {
@@ -145,8 +183,14 @@ private struct PopupListView: View {
                             .onTapGesture { choose(suggestion) }
                     }
                 }
-                .padding(6)
+                .padding(.horizontal, PopupPanel.contentInset)
             }
+            /* The vertical breathing room is a content margin rather than
+               padding on the stack: scrollTo aligns a row to the edge of the
+               scrollable region, and margins move that edge inward, so a row
+               scrolled into view keeps its 6pt gap instead of touching the
+               panel's edge. */
+            .contentMargins(.vertical, PopupPanel.contentInset, for: .scrollContent)
             .onChange(of: model.selectedIndex) { _, index in
                 proxy.scrollTo(index)
             }

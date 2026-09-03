@@ -6,6 +6,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let server = SocketServer()
     private let sessions = SessionRegistry()
     private let specStore = SpecStore()
+    private let derivedSpecs = DerivedSpecStore()
     private var completions: CompletionController?
     private var settingsWindow: SettingsWindowController?
     private var onboardingWindow: OnboardingWindowController?
@@ -27,7 +28,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         if TranslocationHealer.healIfNeeded() { return }
         completions = CompletionController(
-            sessions: sessions, server: server, specDirectories: Self.specDirectories)
+            sessions: sessions, server: server, specDirectories: Self.specDirectories,
+            derived: derivedSpecs)
         setUpMainMenu()
         setUpStatusItem()
         startServer()
@@ -86,19 +88,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func handle(_ message: ShellMessage, from client: SocketServer.ClientID) {
         switch message {
-        case .hello(let sid, let pid, let tty, let term, let dark):
+        case .hello(let sid, let pid, let tty, let term, let dark, let path):
             sessions.register(Session(client: client, sid: sid, pid: pid, tty: tty, term: term,
-                                      prefersDark: dark))
+                                      prefersDark: dark, searchPath: path))
             if ProcessInfo.processInfo.environment["SILL_DEBUG_AUTOINSERT"] != nil {
                 NSLog("Sill: hello term=%@ dark=%@", term, dark.map { "\($0)" } ?? "unknown")
             }
-        case .buffer(_, let buf, let cur, let pwd, _, _, let cols, let rows):
+        case .buffer(_, let buf, let cur, let pwd, let row, let col, let cols, let rows, let grid):
             guard let session = sessions[client] else { return }
             session.buffer = buf
             session.cursor = cur
             session.pwd = pwd
             session.cols = cols
             session.rows = rows
+            session.anchorRow = row
+            session.anchorCol = col
+            session.grid = grid
             sessions.markActive(client)
             /* Round-trip smoke test for the shell integration (`zle -F` reply
                handler, key widgets, _sill_apply), used by scripted
@@ -133,7 +138,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func showSettings() {
         if settingsWindow == nil {
-            settingsWindow = SettingsWindowController(updater: updater, specStore: specStore)
+            settingsWindow = SettingsWindowController(updater: updater, specStore: specStore,
+                                                      derivedSpecs: derivedSpecs)
             if let window = settingsWindow?.window {
                 NotificationCenter.default.addObserver(
                     forName: NSWindow.willCloseNotification, object: window, queue: .main

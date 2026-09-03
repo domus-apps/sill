@@ -28,8 +28,9 @@ enum SettingsPane: Int, CaseIterable {
 final class SettingsWindowController: NSWindowController {
     private let splitViewController: SettingsSplitViewController
 
-    init(updater: UpdaterController, specStore: SpecStore) {
-        splitViewController = SettingsSplitViewController(updater: updater, specStore: specStore)
+    init(updater: UpdaterController, specStore: SpecStore, derivedSpecs: DerivedSpecStore) {
+        splitViewController = SettingsSplitViewController(
+            updater: updater, specStore: specStore, derivedSpecs: derivedSpecs)
         let window = NSWindow(contentViewController: splitViewController)
         window.styleMask = [.titled, .closable, .miniaturizable, .fullSizeContentView]
         /* A toolbar (even an empty one) is required for the full-height
@@ -68,11 +69,12 @@ final class SettingsSplitViewController: NSSplitViewController {
     private let generalPane: NSViewController
     private var currentPane: NSViewController?
 
-    init(updater: UpdaterController, specStore: SpecStore) {
+    init(updater: UpdaterController, specStore: SpecStore, derivedSpecs: DerivedSpecStore) {
         /* The panes are SwiftUI grouped Forms — the exact section-header +
            rounded-box arrangement Xcode's settings use — hosted inside the
            AppKit split chrome. */
-        let model = SettingsModel(updater: updater, specStore: specStore)
+        let model = SettingsModel(updater: updater, specStore: specStore,
+                                  derivedSpecs: derivedSpecs)
         generalPane = NSHostingController(rootView: GeneralSettingsView(model: model))
         super.init(nibName: nil, bundle: nil)
 
@@ -249,11 +251,14 @@ final class SettingsSidebarViewController: NSViewController, NSTableViewDataSour
 final class SettingsModel: ObservableObject {
     let updater: UpdaterController
     let specStore: SpecStore
+    let derivedSpecs: DerivedSpecStore
 
-    init(updater: UpdaterController, specStore: SpecStore) {
+    init(updater: UpdaterController, specStore: SpecStore, derivedSpecs: DerivedSpecStore) {
         self.updater = updater
         self.specStore = specStore
-        for name in [AppPreferences.changed, SpecStore.updated, SpecStore.statusChanged] {
+        self.derivedSpecs = derivedSpecs
+        for name in [AppPreferences.changed, SpecStore.updated, SpecStore.statusChanged,
+                     DerivedSpecStore.updated] {
             NotificationCenter.default.addObserver(
                 forName: name, object: nil, queue: .main
             ) { [weak self] _ in
@@ -322,6 +327,21 @@ final class SettingsModel: ObservableObject {
 
     func updateSpecs() {
         specStore.updateIfNeeded(force: true)
+    }
+
+    var learnedCount: Int { derivedSpecs.learnedCommands.count }
+
+    var learnedLabel: String {
+        switch learnedCount {
+        case 0: "Nothing learned yet"
+        case 1: "1 command learned"
+        case let n: "\(n) commands learned"
+        }
+    }
+
+    func forgetLearned() {
+        derivedSpecs.forgetAll()
+        objectWillChange.send()
     }
 
     var versionLabel: String {
@@ -420,6 +440,26 @@ struct GeneralSettingsView: View {
                     Text("Definitions for hundreds of CLIs, from the open-source withfig/autocomplete project. Refreshed daily in the background.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                }
+                VStack(alignment: .leading, spacing: 3) {
+                    Toggle(
+                        "Learn unknown commands from --help",
+                        isOn: model.binding({ AppPreferences.learnsFromHelp },
+                                            { AppPreferences.learnsFromHelp = $0 })
+                    )
+                    Text("When a command has no spec, Sill runs it once with --help in the background and keeps what it learns on this Mac. Real programs only — shell scripts are never run.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    HStack {
+                        Text(model.learnedLabel)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Forget All") { model.forgetLearned() }
+                            .controlSize(.small)
+                            .disabled(model.learnedCount == 0)
+                    }
+                    .padding(.top, 2)
                 }
             } header: {
                 Text("Specs")

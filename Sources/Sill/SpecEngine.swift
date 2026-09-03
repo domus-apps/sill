@@ -20,13 +20,34 @@ final class SpecEngine: SpecProviding {
 
     /// Directories searched for `<command>.js`, in order.
     var specDirectories: [URL]
+    /// Specs learned from `--help`, consulted when no file matches.
+    let derived: DerivedSpecStore?
 
-    init(specDirectories: [URL] = []) {
+    init(specDirectories: [URL] = [], derived: DerivedSpecStore? = nil) {
         self.specDirectories = specDirectories
+        self.derived = derived
         context = JSContext(virtualMachine: JSVirtualMachine())
         context.exceptionHandler = { _, exception in
             NSLog("Sill: spec JS exception: %@", exception?.toString() ?? "?")
         }
+        if derived != nil {
+            NotificationCenter.default.addObserver(
+                forName: DerivedSpecStore.updated, object: nil, queue: .main
+            ) { [weak self] note in
+                if let command = note.userInfo?["command"] as? String {
+                    self?.invalidate(command)
+                } else {
+                    self?.cache.removeAll()
+                    self?.cacheOrder.removeAll()
+                }
+            }
+        }
+    }
+
+    /// Drops a cached spec so the next lookup re-reads it.
+    func invalidate(_ command: String) {
+        cache.removeValue(forKey: command)
+        cacheOrder.removeAll { $0 == command }
     }
 
     /// The spec for a command name ("git") or a `loadSpec` path ("aws/s3"),
@@ -49,7 +70,18 @@ final class SpecEngine: SpecProviding {
             }
             return node
         }
+        if let json = derived?.specJSON(for: command), let node = evaluateJSON(json) {
+            cache[command] = node
+            cacheOrder.append(command)
+            return node
+        }
         return nil
+    }
+
+    /// Evaluates a Fig-shaped JSON document (a learned spec) into a node.
+    func evaluateJSON(_ json: String) -> SpecNode? {
+        guard let spec = context.evaluateScript("(\(json))"), spec.isObject else { return nil }
+        return SpecNode(spec)
     }
 
     /// Evaluates one converted spec file (IIFE assigning `var __sillSpec`)
@@ -102,6 +134,10 @@ struct SpecNode {
     }
 
     var isHidden: Bool { property("hidden")?.toBool() ?? false }
+
+    /// A learned subcommand whose own options haven't been read yet
+    /// (DerivedSpecStore explores it when the user gets there).
+    var needsExploration: Bool { property("_sillUnexplored")?.toBool() ?? false }
 
     var priority: Int {
         guard let p = property("priority"), p.isNumber else { return 50 }

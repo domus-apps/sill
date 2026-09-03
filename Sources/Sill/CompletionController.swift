@@ -9,6 +9,7 @@ final class CompletionController {
     private let sessions: SessionRegistry
     private let server: SocketServer
     private let engine: SpecEngine
+    private let derived: DerivedSpecStore
     private let parser: CompletionParser
     private let generators = GeneratorRunner()
     private let recency = RecencyStore()
@@ -31,11 +32,22 @@ final class CompletionController {
     /// Drops generator replies that arrive after the buffer moved on.
     private var generation = 0
 
-    init(sessions: SessionRegistry, server: SocketServer, specDirectories: [URL]) {
+    init(sessions: SessionRegistry, server: SocketServer, specDirectories: [URL],
+         derived: DerivedSpecStore) {
         self.sessions = sessions
         self.server = server
-        engine = SpecEngine(specDirectories: specDirectories)
+        self.derived = derived
+        engine = SpecEngine(specDirectories: specDirectories, derived: derived)
         parser = CompletionParser(engine: engine, recency: recency)
+
+        // A spec learned from --help just landed: the list for the buffer
+        // on screen may be different now.
+        NotificationCenter.default.addObserver(
+            forName: DerivedSpecStore.updated, object: nil, queue: .main
+        ) { [weak self] _ in
+            guard let self, let session = self.sessions.activeSession else { return }
+            self.bufferChanged(session)
+        }
 
         popup.onChoose = { [weak self] suggestion in
             self?.accept(suggestion)
@@ -52,7 +64,10 @@ final class CompletionController {
 
     func bufferChanged(_ session: Session) {
         if let suppressed = suppressedBuffer {
-            if session.buffer == suppressed { return }
+            if session.buffer == suppressed {
+                hide()  // Esc, or a just-completed word echoing back
+                return
+            }
             suppressedBuffer = nil
         }
         refresh(session)
@@ -83,6 +98,14 @@ final class CompletionController {
         let currentGeneration = generation
 
         let result = parser.complete(buffer: session.buffer, cursor: session.cursor)
+        if AppPreferences.learnsFromHelp {
+            if let unknown = result.unknownCommand {
+                derived.ensure(command: unknown, searchPath: session.searchPath)
+            }
+            if let path = result.unexploredPath {
+                derived.explore(path: path, searchPath: session.searchPath)
+            }
+        }
         let command = result.commandTokens.first ?? ""
         presentedCommand = command
         var suggestions = result.suggestions
@@ -120,8 +143,17 @@ final class CompletionController {
     private func currentSuggestions() -> [Suggestion] { presented }
 
     private func present(_ suggestions: [Suggestion], for session: Session) {
+        /* The word is finished: one suggestion left and it is exactly what
+           has been typed. There is nothing to complete, so stay out of the
+           way — Return runs the command and Tab goes to the shell, instead
+           of both being held for a completion that would change nothing. */
+        if suggestions.count == 1,
+           suggestions[0].insertsNothing(before: String(session.buffer.prefix(session.cursor))) {
+            hide()
+            return
+        }
         guard !suggestions.isEmpty, sessions.activeSession === session,
-              let placement = CaretLocator.locate()
+              let placement = CaretLocator.locate(for: session)
         else {
             hide()
             return
@@ -156,7 +188,8 @@ final class CompletionController {
         placementWatchdog = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) {
             [weak self] _ in
             guard let self, popup.isVisible, let shown = shownPlacement else { return }
-            guard let now = CaretLocator.locate(), now.precise == shown.precise,
+            guard let session = sessions.activeSession,
+                  let now = CaretLocator.locate(for: session), now.precise == shown.precise,
                   abs(now.rect.minY - shown.rect.minY) < 2,      // same line
                   abs(now.rect.minX - shown.rect.minX) < 240     // not a window move
             else {
@@ -221,9 +254,22 @@ final class CompletionController {
 
     private func acceptInto(_ session: Session, _ suggestion: Suggestion) {
         recency.record(command: presentedCommand, display: suggestion.display)
+        /* Insertions carry no trailing space, so the buffer the shell reports
+           back still ends in the completed word — which would match itself
+           and re-open the popup on the very item just chosen. Stay down
+           until the buffer changes again (a space, `/`, more typing);
+           a folder insertion ends in "/" and should keep listing, so it is
+           exempt. */
+        if !suggestion.insertText.hasSuffix("/") {
+            let prefix = String(session.buffer.prefix(session.cursor))
+            let suffix = String(session.buffer.dropFirst(session.cursor))
+            suppressedBuffer = String(prefix.dropLast(suggestion.deleteCount))
+                + suggestion.insertText + suffix
+        }
         server.send(InsertCommand(del: suggestion.deleteCount, text: suggestion.insertText),
                     to: session.client)
-        // The shell reports the applied buffer right back, which re-runs the
-        // pipeline for the next word — the popup follows along naturally.
+        // The choice is made: down now, not when the shell echoes the buffer
+        // back (which re-runs the pipeline — for a folder, the next listing).
+        hide()
     }
 }

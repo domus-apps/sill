@@ -3,14 +3,22 @@
 # sends back. Installed by the app as one `source` line in ~/.zshrc.
 #
 # Protocol (newline-delimited JSON, one connection per shell session):
-#   → {"t":"hello","v":1,"sid":…,"pid":…,"tty":…,"term":…,"dark":…}
+#   → {"t":"hello","v":1,"sid":…,"pid":…,"tty":…,"term":…,"dark":…,"path":…}
+#     ("path" — $PATH, so the app can find a command's executable when it
+#     learns an unknown command from its --help; the app never runs a shell)
 #     ("dark" — whether the terminal's background is dark, from an OSC 11
 #     query answered by Terminal.app and iTerm2; absent when unanswered, and
 #     the popup then follows the system appearance)
 #   → {"t":"buf","sid":…,"buf":…,"cur":…,"pwd":…,"cols":…,"rows":…}
 #     (caret coordinates come from Accessibility on the app side — reading
 #     the terminal's CPR reply inside a ZLE widget corrupts ZLE's terminal
-#     state and kills every later hook, so the shell sends no cell anchor)
+#     state and kills every later hook, so the shell sends no cell anchor…)
+#     …except for Ghostty and cmux, whose accessibility tree has no caret:
+#     there the message also carries "row","col" (the cell where the buffer
+#     starts) and "cellw","cellh","tw","th" (cell and text-area size in
+#     pixels), measured in precmd — OUTSIDE ZLE, where a raw read is safe —
+#     with CPR and XTWINOPS 16/14. Keys typed ahead of the prompt that the
+#     read swallows are handed back to ZLE at line-init.
 #   → {"t":"key","sid":…,"key":…}                (steering key while popup up)
 #   → {"t":"end","sid":…}                       (line accepted/aborted — hide)
 #   ← {"t":"insert","del":N,"text":…}            (replace the partial token)
@@ -27,6 +35,7 @@
 [[ -n "$TMUX" ]] && return 0                             # pane-relative rows break positioning
 case "$TERM_PROGRAM" in
     Apple_Terminal|iTerm.app|vscode) ;;
+    ghostty|cmux) ;;
     *) return 0 ;;
 esac
 
@@ -46,6 +55,78 @@ typeset -g _sill_registered=0  # zle -F registration needs a live ZLE
 
 _sill_sock="$HOME/Library/Application Support/Sill/sill.sock"
 
+# Grid terminals (no accessibility caret): geometry the app needs, refreshed
+# every prompt by _sill_measure_grid.
+typeset -g _sill_grid=0
+[[ "$TERM_PROGRAM" == (ghostty|cmux) ]] && _sill_grid=1
+typeset -g _sill_row=0 _sill_col=0 _sill_cellw=0 _sill_cellh=0 _sill_tw=0 _sill_th=0
+typeset -g _sill_grid_misses=0  # give up only after a few silent prompts
+typeset -g _sill_typeahead=""
+
+# Asks the terminal for its background color (OSC 11), the cell size (CSI 16
+# t), the text-area size (CSI 14 t) and the cursor position (CSI 6 n) in one
+# round trip — replies come back in order, so the CPR that ends the read
+# proves the others were consumed — then works out
+# where the buffer will start once the prompt is drawn: the CPR cell moved
+# right by the prompt's last line (display width, escapes stripped) and down
+# by the lines it spans. Anything read that isn't one of the replies was
+# typed ahead of the prompt and is kept for ZLE. A terminal that doesn't
+# answer within 300ms is not asked again this session.
+_sill_measure_grid() {
+    (( _sill_grid )) || return 0
+    setopt localoptions extendedglob
+    _sill_ask_tty $'\e]11;?\a\e[16t\e[14t\e[6n' "*$'\e['[0-9]##\;[0-9]##R"
+    local reply=$_sill_reply
+    if [[ "$reply" != *R ]]; then
+        # A terminal busy with its own startup can miss the first prompt;
+        # only one that never answers is written off.
+        (( ++_sill_grid_misses >= 3 )) && _sill_grid=0
+        _sill_parse_background "$reply"
+        _sill_typeahead+=$(_sill_strip_replies "$reply")
+        _sill_grid_debug "no CPR reply"
+        return 0
+    fi
+    _sill_grid_misses=0
+    _sill_parse_background "$reply"
+    local -a m
+    if [[ "$reply" == (#b)*$'\e[6;'([0-9]##)\;([0-9]##)t* ]]; then
+        _sill_cellh=$match[1] _sill_cellw=$match[2]
+    fi
+    if [[ "$reply" == (#b)*$'\e[4;'([0-9]##)\;([0-9]##)t* ]]; then
+        _sill_th=$match[1] _sill_tw=$match[2]
+    fi
+    if [[ "$reply" == (#b)*$'\e['([0-9]##)\;([0-9]##)R* ]]; then
+        _sill_row=$match[1] _sill_col=$match[2]
+    fi
+    _sill_typeahead+=$(_sill_strip_replies "$reply")
+
+    # The prompt as it will render: escapes out, then width of its last line.
+    local p=${(%%)PROMPT}
+    p=${p//$'\e'\[[0-9\;?]#[[:alpha:]]/}
+    p=${p//$'\e'\][^$'\a']#$'\a'/}
+    local newlines=${#${p//[^$'\n']/}}
+    local last=${p##*$'\n'}
+    if (( newlines > 0 )); then
+        _sill_col=$(( 1 + ${(m)#last} ))
+    else
+        _sill_col=$(( _sill_col + ${(m)#last} ))
+    fi
+    _sill_row=$(( _sill_row + newlines ))
+    (( _sill_row > LINES )) && _sill_row=$LINES
+    _sill_grid_debug "prompt=[$last]"
+}
+
+# Diagnosing a new terminal means seeing what it answered, in a shell that
+# terminal itself started (no env var can reach it) — so: create
+# ~/.sill-grid-debug and every measurement lands in /tmp/sill-grid.log.
+_sill_grid_debug() {
+    [[ -f "$HOME/.sill-grid-debug" ]] || return 0
+    print -r -- "$(date +%T) $TERM_PROGRAM $1 reply=[${reply//$'\e'/^[}]" \
+        "row=$_sill_row col=$_sill_col cell=${_sill_cellw}x${_sill_cellh}" \
+        "text=${_sill_tw}x${_sill_th} grid=${COLUMNS}x${LINES} dark=$_sill_dark" \
+        >> /tmp/sill-grid.log
+}
+
 # Ask the terminal for its background color (OSC 11) so the popup can match
 # a dark terminal on a light system and vice versa. Done ONCE here, at load,
 # before ZLE exists: reading the tty inside a widget corrupts ZLE, and
@@ -54,13 +135,50 @@ _sill_sock="$HOME/Library/Application Support/Sill/sill.sock"
 # (no reply within 200ms) leaves the appearance to the system.
 typeset -g _sill_dark=""
 _sill_query_background() {
-    [[ -t 0 && -t 1 ]] || return 0
-    local reply="" ch
-    print -n '\e]11;?\a' > /dev/tty
-    while read -rs -t 0.2 -k1 ch < /dev/tty; do
-        reply+="$ch"
-        [[ "$ch" == $'\a' || "$reply" == *$'\e\\' ]] && break
+    _sill_ask_tty $'\e]11;?\a' "*($'\a'|$'\e'\\\\)" || return 0
+    _sill_parse_background "$_sill_reply"
+}
+
+# Asks the terminal something and reads its answer with the tty held in
+# raw, no-echo mode for the WHOLE exchange. Reading a character at a time
+# is not enough: between two `read -k` calls the line discipline is back in
+# canonical mode with echo on, so a reply arriving in that window is printed
+# on screen (the stray "^[]11;rgb:…" line) even though we do go on to read
+# it. Terminals answer a few milliseconds late, which lands squarely in that
+# window. Sets _sill_reply; fails when the tty can't be queried.
+typeset -g _sill_reply=""
+_sill_ask_tty() {
+    setopt localoptions extendedglob
+    local query=$1 terminator=$2 saved ch
+    _sill_reply=""
+    [[ -t 0 && -t 1 ]] || return 1
+    saved=$(stty -g 2>/dev/null) || return 1
+    # min 0 time 3: a read with nothing to take returns empty after 0.3s
+    # instead of blocking, so an unanswering terminal costs one timeout.
+    stty -echo -icanon min 0 time 3 2>/dev/null
+    print -n -- "$query"
+    while read -rs -t 0.3 -k 1 ch; do
+        _sill_reply+=$ch
+        [[ "$_sill_reply" == ${~terminator} ]] && break
     done
+    stty "$saved" 2>/dev/null
+    [[ -n "$_sill_reply" ]]
+}
+
+# What is left of a read once the terminal's own answers (the OSC 11 colour,
+# terminated by BEL or ST, and the CSI window/cursor reports) are taken out:
+# bytes the user typed ahead of the prompt, which belong to ZLE.
+_sill_strip_replies() {
+    setopt localoptions extendedglob
+    local rest=$1
+    rest=${rest//$'\e'\]11\;[^$'\a']#$'\a'/}
+    rest=${rest//$'\e'\]11\;*$'\e\\'/}
+    print -rn -- ${rest//$'\e'\[[0-9\;]#[tR]/}
+}
+
+# Sets _sill_dark from an OSC 11 reply ("…rgb:RRRR/GGGG/BBBB" + terminator).
+_sill_parse_background() {
+    local reply=$1
     local rgb="${reply##*rgb:}"
     [[ "$rgb" == "$reply" ]] && return 0
     rgb="${rgb%%[$'\a'$'\e']*}"
@@ -75,7 +193,11 @@ _sill_query_background() {
     local -i luma=$(( (2126 * R + 7152 * G + 722 * B) / 10000 ))
     (( luma < 128 )) && _sill_dark=true || _sill_dark=false
 }
-_sill_query_background
+# Grid terminals fold this query into their precmd round trip instead (one
+# read, and the CPR reply that ends it proves this one was consumed too —
+# Ghostty answers late enough at startup that a separate query here times
+# out and the reply is left to be echoed at the first prompt).
+(( _sill_grid )) || _sill_query_background
 
 # JSON string escaping in plain zsh: backslash first, then quote, then the
 # whitespace controls; any remaining C0 bytes are stripped.
@@ -99,7 +221,7 @@ _sill_connect() {
     fi
     _sill_fd=$REPLY
     print -u $_sill_fd -r -- \
-        "{\"t\":\"hello\",\"v\":1,\"sid\":\"$_sill_sid\",\"pid\":$$,\"tty\":\"$(_sill_esc "$TTY")\",\"term\":\"$(_sill_esc "$TERM_PROGRAM")\"${_sill_dark:+,\"dark\":$_sill_dark}}" \
+        "{\"t\":\"hello\",\"v\":1,\"sid\":\"$_sill_sid\",\"pid\":$$,\"tty\":\"$(_sill_esc "$TTY")\",\"term\":\"$(_sill_esc "$TERM_PROGRAM")\"${_sill_dark:+,\"dark\":$_sill_dark},\"path\":\"$(_sill_esc "$PATH")\"}" \
         2>/dev/null || _sill_disconnect
 }
 
@@ -122,7 +244,9 @@ _sill_send_buf() {
     local state="$BUFFER"$'\x1f'"$CURSOR"
     [[ "$state" == "$_sill_last" ]] && return 0
     _sill_last=$state
-    _sill_send "{\"t\":\"buf\",\"sid\":\"$_sill_sid\",\"buf\":\"$(_sill_esc "$BUFFER")\",\"cur\":$CURSOR,\"pwd\":\"$(_sill_esc "$PWD")\",\"cols\":$COLUMNS,\"rows\":$LINES}"
+    local grid=""
+    (( _sill_grid )) && grid=",\"row\":$_sill_row,\"col\":$_sill_col,\"cellw\":$_sill_cellw,\"cellh\":$_sill_cellh,\"tw\":$_sill_tw,\"th\":$_sill_th"
+    _sill_send "{\"t\":\"buf\",\"sid\":\"$_sill_sid\",\"buf\":\"$(_sill_esc "$BUFFER")\",\"cur\":$CURSOR,\"pwd\":\"$(_sill_esc "$PWD")\",\"cols\":$COLUMNS,\"rows\":$LINES$grid}"
 }
 
 _sill_reply_handler() {
@@ -252,8 +376,9 @@ zle -N _sill_key_esc
 # line-init → 400ms; set before the editor starts → 14ms). It is restored
 # when the line ends. Terminals send escape sequences in one burst, so 10ms
 # is plenty; a KEYTIMEOUT the user already set at or below that is left
-# alone. Only a variable assignment happens here — precmd never reads the
-# tty (that could swallow keys typed ahead of the prompt).
+# alone. Only a variable assignment happens here; the one precmd step that
+# does read the tty (_sill_measure_grid, grid terminals only) hands any
+# swallowed keys back to ZLE.
 _sill_lower_keytimeout() {
     (( _sill_fd >= 0 )) || (( ! _sill_dead )) || return 0
     [[ -n "$_sill_saved_keytimeout" ]] && return 0   # already lowered this line
@@ -273,6 +398,10 @@ _sill_restore_keytimeout() {
 }
 
 _sill_line_init() {
+    if [[ -n "$_sill_typeahead" ]]; then
+        zle -U -- "$_sill_typeahead"   # keys the grid measurement swallowed
+        _sill_typeahead=""
+    fi
     _sill_connect
     if (( _sill_fd >= 0 && ! _sill_registered )); then
         zle -F $_sill_fd _sill_reply_handler
@@ -292,6 +421,7 @@ _sill_line_finish() {
 _sill_precmd() {
     _sill_dead=0   # the app may have (re)started; allow one reconnect attempt
     _sill_lower_keytimeout
+    _sill_measure_grid
 }
 
 add-zle-hook-widget zle-line-init _sill_line_init

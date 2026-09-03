@@ -11,6 +11,8 @@ final class Session {
     /// Whether the terminal's background is dark (nil: unknown — follow
     /// the system appearance).
     let prefersDark: Bool?
+    /// The shell's $PATH — where its commands actually come from.
+    let searchPath: String
 
     var buffer = ""
     var cursor = 0
@@ -21,15 +23,19 @@ final class Session {
     var anchorCol = 1
     var cols = 80
     var rows = 24
+    /// Cell/text-area pixel sizes, from terminals the plugin queries itself.
+    var grid: GridInfo?
 
     init(client: SocketServer.ClientID, sid: String, pid: Int32, tty: String, term: String,
-         prefersDark: Bool? = nil) {
+         prefersDark: Bool? = nil, searchPath: String? = nil) {
         self.client = client
         self.sid = sid
         self.pid = pid
         self.tty = tty
         self.term = term
         self.prefersDark = prefersDark
+        self.searchPath = searchPath
+            ?? ProcessInfo.processInfo.environment["PATH"] ?? "/usr/bin:/bin"
     }
 
     /// The caret's terminal-grid cell, derived from the anchor plus the
@@ -48,25 +54,34 @@ final class Session {
 
 /// Terminals Sill knows how to position against: the frontmost app's bundle
 /// id is matched to the $TERM_PROGRAM each session reported. VS Code's forks
-/// (Insiders, VSCodium, Cursor) all report "vscode".
+/// (Insiders, VSCodium, Cursor) all report "vscode"; cmux embeds libghostty
+/// and inherits Ghostty's environment.
 enum SupportedTerminal {
-    static let termPrograms: [String: String] = [
-        "com.apple.Terminal": "Apple_Terminal",
-        "com.googlecode.iterm2": "iTerm.app",
-        "com.microsoft.VSCode": "vscode",
-        "com.microsoft.VSCodeInsiders": "vscode",
-        "com.vscodium": "vscode",
-        "com.todesktop.230313mzl4w4u92": "vscode",  // Cursor
+    static let termPrograms: [String: [String]] = [
+        "com.apple.Terminal": ["Apple_Terminal"],
+        "com.googlecode.iterm2": ["iTerm.app"],
+        "com.microsoft.VSCode": ["vscode"],
+        "com.microsoft.VSCodeInsiders": ["vscode"],
+        "com.vscodium": ["vscode"],
+        "com.todesktop.230313mzl4w4u92": ["vscode"],  // Cursor
+        "com.mitchellh.ghostty": ["ghostty"],
+        "com.cmuxterm.app": ["ghostty", "cmux"],
     ]
 
-    static func termProgram(forBundleID bundleID: String) -> String? {
-        termPrograms[bundleID]
+    static func supports(bundleID: String, termProgram: String) -> Bool {
+        termPrograms[bundleID]?.contains(termProgram) ?? false
     }
 
     /// Electron apps expose their web content to AX only once an assistive
     /// client asks — Sill has to ask before the caret can be located.
     static func isElectron(bundleID: String) -> Bool {
-        termPrograms[bundleID] == "vscode"
+        termPrograms[bundleID] == ["vscode"]
+    }
+
+    /// Terminals whose accessibility tree has no caret: the popup is placed
+    /// from the cell grid the plugin measures (see GridInfo) instead.
+    static func usesGrid(bundleID: String) -> Bool {
+        termPrograms[bundleID]?.contains("ghostty") ?? false
     }
 }
 
@@ -100,7 +115,7 @@ final class SessionRegistry {
     var activeSession: Session? {
         guard let client = activeClient, let session = sessions[client],
               let bundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
-              SupportedTerminal.termProgram(forBundleID: bundleID) == session.term
+              SupportedTerminal.supports(bundleID: bundleID, termProgram: session.term)
         else { return nil }
         return session
     }

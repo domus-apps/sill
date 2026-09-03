@@ -10,7 +10,7 @@ if let index = CommandLine.arguments.firstIndex(of: "--complete"),
     if let dir = ProcessInfo.processInfo.environment["SILL_SPEC_DIR"] {
         directories.append(URL(fileURLWithPath: dir))
     }
-    let engine = SpecEngine(specDirectories: directories)
+    let engine = SpecEngine(specDirectories: directories, derived: DerivedSpecStore())
     let result = CompletionParser(engine: engine)
         .complete(buffer: buffer, cursor: buffer.count)
     for s in result.suggestions {
@@ -42,6 +42,34 @@ if let index = CommandLine.arguments.firstIndex(of: "--complete"),
             }
         }
     }
+    if let unknown = result.unknownCommand {
+        print("(no spec for \"\(unknown)\" — try --derive \(unknown))")
+    }
+    if let path = result.unexploredPath {
+        print("(learned subcommand not explored yet: \(path.joined(separator: " ")))")
+    }
+    exit(0)
+}
+
+/* `Sill --derive <command>` learns a command from its --help right now,
+   using this process's PATH, and says what it found — the file then serves
+   `--complete` like any corpus spec. */
+if let index = CommandLine.arguments.firstIndex(of: "--derive"),
+   CommandLine.arguments.count > index + 1 {
+    let command = CommandLine.arguments[index + 1]
+    let searchPath = ProcessInfo.processInfo.environment["PATH"] ?? "/usr/bin:/bin"
+    print(DerivedSpecStore.learnNow(command: command, searchPath: searchPath))
+    if let object = DerivedSpecStore.loadObject(command),
+       let data = try? JSONSerialization.data(withJSONObject: object,
+                                              options: [.prettyPrinted, .sortedKeys]) {
+        print(String(decoding: data, as: UTF8.self))
+    }
+    exit(0)
+}
+
+if let index = CommandLine.arguments.firstIndex(of: "--probe-text"),
+   CommandLine.arguments.count > index + 1 {
+    AXProbe.probeText(bundleID: CommandLine.arguments[index + 1])
     exit(0)
 }
 
