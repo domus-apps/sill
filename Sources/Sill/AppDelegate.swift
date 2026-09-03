@@ -94,7 +94,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if ProcessInfo.processInfo.environment["SILL_DEBUG_AUTOINSERT"] != nil {
                 NSLog("Sill: hello term=%@ dark=%@", term, dark.map { "\($0)" } ?? "unknown")
             }
-        case .buffer(_, let buf, let cur, let pwd, let row, let col, let cols, let rows, let grid):
+        case .buffer(_, let buf, let cur, let pwd, let row, let col, let cols, let rows,
+                     let grid, let noGrid):
             guard let session = sessions[client] else { return }
             session.buffer = buf
             session.cursor = cur
@@ -104,6 +105,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             session.anchorRow = row
             session.anchorCol = col
             session.grid = grid
+            session.noGrid = noGrid
             sessions.markActive(client)
             /* Round-trip smoke test for the shell integration (`zle -F` reply
                handler, key widgets, _sill_apply), used by scripted

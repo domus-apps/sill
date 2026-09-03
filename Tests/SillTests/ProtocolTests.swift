@@ -30,14 +30,21 @@ import Testing
     let buf = ShellMessage.decode(Data(
         #"{"t":"buf","sid":"1-2","buf":"git ch","cur":6,"pwd":"/x","row":3,"col":5,"cols":80,"rows":24}"#.utf8))
     #expect(buf == .buffer(sid: "1-2", buf: "git ch", cur: 6, pwd: "/x",
-                           row: 3, col: 5, cols: 80, rows: 24, grid: nil))
+                           row: 3, col: 5, cols: 80, rows: 24, grid: nil, noGrid: false))
 
     // Grid terminals (Ghostty, cmux) add the pixel geometry they measured.
     let gridBuf = ShellMessage.decode(Data(
         #"{"t":"buf","sid":"1-2","buf":"","cur":0,"pwd":"/x","cols":80,"rows":24,"row":4,"col":3,"cellw":16,"cellh":34,"tw":1280,"th":816}"#.utf8))
     #expect(gridBuf == .buffer(sid: "1-2", buf: "", cur: 0, pwd: "/x", row: 4, col: 3, cols: 80, rows: 24,
                                grid: GridInfo(cellPixels: CGSize(width: 16, height: 34),
-                                              textPixels: CGSize(width: 1280, height: 816))))
+                                              textPixels: CGSize(width: 1280, height: 816)),
+                               noGrid: false))
+
+    // A terminal that never answers says so, and is placed by window.
+    let noGrid = ShellMessage.decode(Data(
+        #"{"t":"buf","sid":"1-2","buf":"","cur":0,"pwd":"/x","cols":80,"rows":24,"nogrid":true}"#.utf8))
+    #expect(noGrid == .buffer(sid: "1-2", buf: "", cur: 0, pwd: "/x", row: 1, col: 1,
+                              cols: 80, rows: 24, grid: nil, noGrid: true))
 
     #expect(ShellMessage.decode(Data(#"{"t":"end","sid":"1-2"}"#.utf8)) == .end(sid: "1-2"))
 }

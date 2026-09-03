@@ -4,6 +4,14 @@ All notable changes to Sill are documented here. The release workflow publishes 
 
 Keep each bullet on a single line: release notes render line breaks literally (both on GitHub and in the update dialog), so wrapped lines would break mid-sentence.
 
+## 1.3.0
+
+- Splitting a pane or resizing the window no longer throws the popup off: it finds the caret again on the very next keystroke, with no Enter needed.
+- Clearing the screen with ⌘K is handled the same way.
+- Fixed a runaway where stray terminal replies could flood the prompt with text until you pressed ^C.
+- In Ghostty the popup now follows the caret from the screen itself, so a wrapped line above the prompt no longer shifts it.
+- A terminal that answers its first query slowly, like a freshly opened pane, now gets a full second instead of losing the whole first line.
+
 ## 1.2.0
 
 - Sill now speaks Korean: Settings, onboarding and the menu follow your system language.

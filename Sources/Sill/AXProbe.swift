@@ -104,6 +104,22 @@ enum AXProbe {
         collect(window, role: "AXTextArea", into: &areas, depth: 0)
         print("text areas:", areas.count)
         for area in areas {
+            func attr(_ name: String) -> CFTypeRef? {
+                var v: CFTypeRef?
+                return AXUIElementCopyAttributeValue(area, name as CFString, &v) == .success ? v : nil
+            }
+            var pos = CGPoint.zero, size = CGSize.zero
+            if let p = attr(kAXPositionAttribute) { AXValueGetValue(p as! AXValue, .cgPoint, &pos) }
+            if let s = attr(kAXSizeAttribute) { AXValueGetValue(s as! AXValue, .cgSize, &size) }
+            let text = attr(kAXValueAttribute) as? String ?? ""
+            let lines = text.components(separatedBy: "\n")
+            let lastFilled = lines.lastIndex(where: { !$0.trimmingCharacters(in: .whitespaces).isEmpty })
+            print("  pane \(Int(pos.x)),\(Int(pos.y)) \(Int(size.width))x\(Int(size.height))",
+                  "focused=\((attr(kAXFocusedAttribute) as? Bool) ?? false)",
+                  "lines=\(lines.count) lastFilled=\(lastFilled.map { $0 + 1 } ?? 0)",
+                  "last=[\(lastFilled.map { lines[$0] } ?? "")]")
+        }
+        for area in areas {
             func attr(_ e: AXUIElement, _ name: String) -> CFTypeRef? {
                 var v: CFTypeRef?
                 return AXUIElementCopyAttributeValue(e, name as CFString, &v) == .success ? v : nil

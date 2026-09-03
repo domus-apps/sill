@@ -78,3 +78,46 @@ import Testing
     #expect(Set(fuzzy) == ["feature/login", "fix/logging"])
     #expect(fuzzy.first == "fix/logging")
 }
+
+// MARK: - Terminal padding, from frames measured on the real apps
+
+@Test func paddingPrefersTheDefaultWhenTheNumbersAllowIt() {
+    let cell = CGSize(width: 8, height: 17)
+    // Ghostty, one pane: 666x432 view around a 82x25 grid (656x425).
+    #expect(CaretLocator.padding(view: CGSize(width: 666, height: 432),
+                                 text: CGSize(width: 656, height: 425), cell: cell) == 2)
+    // cmux, one pane: 669x691 around 664x680.
+    #expect(CaretLocator.padding(view: CGSize(width: 669, height: 691),
+                                 text: CGSize(width: 664, height: 680), cell: cell) == 2)
+    // A configured 10pt padding leaves too much slack for the default.
+    let wide = CaretLocator.padding(view: CGSize(width: 656 + 20 + 5, height: 425 + 20 + 9),
+                                    text: CGSize(width: 656, height: 425), cell: cell)
+    #expect(wide > 8 && wide < 13)
+    // Nothing reported, or a view smaller than its own grid: fall back.
+    #expect(CaretLocator.padding(view: CGSize(width: 666, height: 432),
+                                 text: .zero, cell: cell) == 2)
+    #expect(CaretLocator.padding(view: CGSize(width: 100, height: 100),
+                                 text: CGSize(width: 656, height: 425), cell: cell) == 2)
+}
+
+@Test func displayWidthCountsWideCharactersAsTwoCells() {
+    #expect(CaretLocator.displayWidth(of: "domus ❯ ") == 8)
+    #expect(CaretLocator.displayWidth(of: "git checkout") == 12)
+    #expect(CaretLocator.displayWidth(of: "한글") == 4)
+    #expect(CaretLocator.displayWidth(of: "프로젝트 ❯ ") == 11)
+    #expect(CaretLocator.displayWidth(of: "") == 0)
+}
+
+@Test func screenRowsCountWrappedLines() {
+    // A 28-column pane, the shape of one quarter of a split Ghostty window:
+    // the login banner is 42 cells and takes two rows, so the prompt after
+    // it is on row 3 — not row 2, which is all the lines themselves say.
+    let banner = "Last login: Thu Sep  3 15:43:01 on ttys039"
+    #expect(CaretLocator.displayWidth(of: banner) == 42)
+    #expect(CaretLocator.wrappedRowsForTesting(banner, cols: 28) == 2)
+    #expect(CaretLocator.wrappedRowsForTesting("~ ❯ bun ", cols: 28) == 1)
+    #expect(CaretLocator.wrappedRowsForTesting("", cols: 28) == 1)
+    // A line filling the width exactly stays on one row.
+    #expect(CaretLocator.wrappedRowsForTesting(String(repeating: "x", count: 28), cols: 28) == 1)
+    #expect(CaretLocator.wrappedRowsForTesting(String(repeating: "x", count: 29), cols: 28) == 2)
+}

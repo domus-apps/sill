@@ -24,7 +24,11 @@ final class Session {
     var cols = 80
     var rows = 24
     /// Cell/text-area pixel sizes, from terminals the plugin queries itself.
+    /// nil until the terminal has answered.
     var grid: GridInfo?
+    /// The terminal never answered the plugin's geometry queries, so there
+    /// is no grid coming and the window is the best anchor available.
+    var noGrid = false
 
     init(client: SocketServer.ClientID, sid: String, pid: Int32, tty: String, term: String,
          prefersDark: Bool? = nil, searchPath: String? = nil) {

@@ -61,6 +61,8 @@ typeset -g _sill_grid=0
 [[ "$TERM_PROGRAM" == (ghostty|cmux) ]] && _sill_grid=1
 typeset -g _sill_row=0 _sill_col=0 _sill_cellw=0 _sill_cellh=0 _sill_tw=0 _sill_th=0
 typeset -g _sill_grid_misses=0  # give up only after a few silent prompts
+typeset -g _sill_nogrid=0       # this terminal answers nothing; place by window
+typeset -g _sill_cols=0 _sill_rows=0   # grid size the measurement was taken at
 typeset -g _sill_typeahead=""
 
 # Asks the terminal for its background color (OSC 11), the cell size (CSI 16
@@ -75,30 +77,43 @@ typeset -g _sill_typeahead=""
 _sill_measure_grid() {
     (( _sill_grid )) || return 0
     setopt localoptions extendedglob
-    _sill_ask_tty $'\e]11;?\a\e[16t\e[14t\e[6n' "*$'\e['[0-9]##\;[0-9]##R"
+    # A terminal still starting up (a cold-launched app, a freshly split
+    # pane) can take most of a second to answer its first query. Waiting
+    # 0.3s there loses the whole first line to the window fallback, so the
+    # first measurement gets a full second; later ones stay snappy.
+    local tenths=3
+    (( _sill_cellw == 0 )) && tenths=10
+    _sill_ask_tty $'\e]11;?\a\e[16t\e[14t\e[6n' cpr $tenths
     local reply=$_sill_reply
-    if [[ "$reply" != *R ]]; then
+    _sill_parse_background "$reply"
+    _sill_typeahead+=$(_sill_strip_replies "$reply")
+
+    # Whatever else came along (a late reply to the previous prompt's query,
+    # a keystroke), the LAST cursor report in the reply is the answer to the
+    # query just sent — the greedy prefix makes each match take it.
+    if [[ "$reply" != (#b)*$'\e['([0-9]##)\;([0-9]##)R* ]]; then
         # A terminal busy with its own startup can miss the first prompt;
-        # only one that never answers is written off.
-        (( ++_sill_grid_misses >= 3 )) && _sill_grid=0
-        _sill_parse_background "$reply"
-        _sill_typeahead+=$(_sill_strip_replies "$reply")
-        _sill_grid_debug "no CPR reply"
+        # only one that never answers is written off — and then it says so,
+        # so the app places by window instead of waiting for a grid that
+        # will never come.
+        if (( ++_sill_grid_misses >= 5 )); then
+            _sill_grid=0
+            _sill_nogrid=1
+        fi
+        _sill_grid_debug "no cursor report"
         return 0
     fi
+    _sill_row=$match[1] _sill_col=$match[2]
     _sill_grid_misses=0
-    _sill_parse_background "$reply"
-    local -a m
     if [[ "$reply" == (#b)*$'\e[6;'([0-9]##)\;([0-9]##)t* ]]; then
         _sill_cellh=$match[1] _sill_cellw=$match[2]
     fi
     if [[ "$reply" == (#b)*$'\e[4;'([0-9]##)\;([0-9]##)t* ]]; then
         _sill_th=$match[1] _sill_tw=$match[2]
     fi
-    if [[ "$reply" == (#b)*$'\e['([0-9]##)\;([0-9]##)R* ]]; then
-        _sill_row=$match[1] _sill_col=$match[2]
-    fi
-    _sill_typeahead+=$(_sill_strip_replies "$reply")
+    # Without a cell size there is nothing the app can place against.
+    (( _sill_cellw > 0 && _sill_cellh > 0 )) || { _sill_grid_debug "no cell size"; return 0 }
+    _sill_cols=$COLUMNS _sill_rows=$LINES
 
     # The prompt as it will render: escapes out, then width of its last line.
     local p=${(%%)PROMPT}
@@ -121,7 +136,7 @@ _sill_measure_grid() {
 # ~/.sill-grid-debug and every measurement lands in /tmp/sill-grid.log.
 _sill_grid_debug() {
     [[ -f "$HOME/.sill-grid-debug" ]] || return 0
-    print -r -- "$(date +%T) $TERM_PROGRAM $1 reply=[${reply//$'\e'/^[}]" \
+    print -r -- "$(date +%T) ${TTY##*/} $1 reply=[${reply//$'\e'/^[}]" \
         "row=$_sill_row col=$_sill_col cell=${_sill_cellw}x${_sill_cellh}" \
         "text=${_sill_tw}x${_sill_th} grid=${COLUMNS}x${LINES} dark=$_sill_dark" \
         >> /tmp/sill-grid.log
@@ -135,7 +150,7 @@ _sill_grid_debug() {
 # (no reply within 200ms) leaves the appearance to the system.
 typeset -g _sill_dark=""
 _sill_query_background() {
-    _sill_ask_tty $'\e]11;?\a' "*($'\a'|$'\e'\\\\)" || return 0
+    _sill_ask_tty $'\e]11;?\a' osc 2 || return 0
     _sill_parse_background "$_sill_reply"
 }
 
@@ -149,18 +164,32 @@ _sill_query_background() {
 typeset -g _sill_reply=""
 _sill_ask_tty() {
     setopt localoptions extendedglob
-    local query=$1 terminator=$2 saved ch
+    # The terminator patterns are written out per kind rather than passed in:
+    # a pattern handed over as a quoted argument arrives with its $'\e'
+    # unexpanded and never matches, which costs the full timeout at every
+    # single prompt.
+    local query=$1 kind=$2 tenths=${3:-3} saved ch
+    local seconds=$(( tenths / 10.0 ))
     _sill_reply=""
     [[ -t 0 && -t 1 ]] || return 1
     saved=$(stty -g 2>/dev/null) || return 1
-    # min 0 time 3: a read with nothing to take returns empty after 0.3s
+    # min 0 time N: a read with nothing to take returns empty after N tenths
     # instead of blocking, so an unanswering terminal costs one timeout.
-    stty -echo -icanon min 0 time 3 2>/dev/null
+    stty -echo -icanon min 0 time $tenths 2>/dev/null
     print -n -- "$query"
-    while read -rs -t 0.3 -k 1 ch; do
+    while read -rs -t $seconds -k 1 ch; do
         _sill_reply+=$ch
-        [[ "$_sill_reply" == ${~terminator} ]] && break
+        case $kind in
+            # Our report is the one right after our text-area reply (replies
+            # come in the order asked); a lone report first is a straggler
+            # from an earlier in-line question, and reading must go on.
+            cpr) [[ "$_sill_reply" == *$'\e[4;'[0-9]##\;[0-9]##t$'\e['[0-9]##\;[0-9]##R ]] && break ;;
+            osc) [[ "$ch" == $'\a' || "$_sill_reply" == *$'\e\\' ]] && break ;;
+        esac
     done
+    # Whatever trails the terminator (a straggler behind it) must not be
+    # left in the tty for ZLE: a short drain takes it along.
+    while read -rs -t 0.01 -k 1 ch; do _sill_reply+=$ch; done
     stty "$saved" 2>/dev/null
     [[ -n "$_sill_reply" ]]
 }
@@ -173,7 +202,12 @@ _sill_strip_replies() {
     local rest=$1
     rest=${rest//$'\e'\]11\;[^$'\a']#$'\a'/}
     rest=${rest//$'\e'\]11\;*$'\e\\'/}
-    print -rn -- ${rest//$'\e'\[[0-9\;]#[tR]/}
+    rest=${rest//$'\e'\[[0-9\;]#[tR]/}
+    # Anything escape-like that is still here is a reply Sill doesn't know,
+    # not typing; and a stray BEL would be send-break.
+    rest=${rest//$'\e'\[[0-9\;?]#[[:alpha:]~]/}
+    rest=${rest//$'\e'\][^$'\a']#$'\a'/}
+    print -rn -- ${rest//[$'\e'$'\a']/}
 }
 
 # Sets _sill_dark from an OSC 11 reply ("…rgb:RRRR/GGGG/BBBB" + terminator).
@@ -241,11 +275,36 @@ _sill_send() {
 
 _sill_send_buf() {
     (( _sill_fd >= 0 )) || return 0
+    # The terminal was resized (a pane split, a window drag). The pane's new
+    # size follows from the grid, and the cell size still holds — the font
+    # didn't change. The anchor is the doubtful part: a reflow can move the
+    # prompt to another row, and re-measuring needs a raw tty read, which is
+    # only safe outside ZLE. It is kept rather than dropped, because for a
+    # terminal that shows Sill its screen (Ghostty) the app reads the caret's
+    # row from there and never looks at it, and for one that doesn't (cmux)
+    # an anchor that may be a row out still beats no completions at all until
+    # the next prompt measures again.
+    if (( _sill_cellw > 0 && (_sill_cols != COLUMNS || _sill_rows != LINES) )); then
+        _sill_cols=$COLUMNS _sill_rows=$LINES
+        _sill_tw=$(( COLUMNS * _sill_cellw ))
+        _sill_th=$(( LINES * _sill_cellh ))
+        _sill_request_cpr   # and take a fresh anchor, through ZLE (below)
+    elif [[ "$LASTWIDGET" == *clear-screen* && "$WIDGET" != _sill_csi_sink ]]; then
+        # ⌘K in Ghostty and cmux (and ^L anywhere) clears the screen and has
+        # the shell redraw the prompt at the top — same prompt, new row.
+        _sill_request_cpr
+    fi
     local state="$BUFFER"$'\x1f'"$CURSOR"
     [[ "$state" == "$_sill_last" ]] && return 0
     _sill_last=$state
+    # Only once there is a measurement to send: zeros would read as a grid
+    # the app can't use, and it needs to tell "not yet" from "never".
     local grid=""
-    (( _sill_grid )) && grid=",\"row\":$_sill_row,\"col\":$_sill_col,\"cellw\":$_sill_cellw,\"cellh\":$_sill_cellh,\"tw\":$_sill_tw,\"th\":$_sill_th"
+    if (( _sill_cellw > 0 )); then
+        grid=",\"row\":$_sill_row,\"col\":$_sill_col,\"cellw\":$_sill_cellw,\"cellh\":$_sill_cellh,\"tw\":$_sill_tw,\"th\":$_sill_th"
+    elif (( _sill_nogrid )); then
+        grid=",\"nogrid\":true"
+    fi
     _sill_send "{\"t\":\"buf\",\"sid\":\"$_sill_sid\",\"buf\":\"$(_sill_esc "$BUFFER")\",\"cur\":$CURSOR,\"pwd\":\"$(_sill_esc "$PWD")\",\"cols\":$COLUMNS,\"rows\":$LINES$grid}"
 }
 
@@ -295,6 +354,89 @@ _sill_apply() {
     _sill_send_buf
 }
 zle -N _sill_apply
+
+# --- Terminal replies that reach ZLE ------------------------------------
+# Two kinds of escape sequence can arrive as INPUT while a line is being
+# edited: the cursor report Sill asks for below, and stragglers — a reply
+# to the prompt-time round trip that came late, or one left in the tty by a
+# query cut short. Left to ZLE they turn into garbage text, and the BEL that
+# ends a colour reply is `send-break`: a new prompt, a new query, another
+# straggler — a runaway that repeats until ^C (seen in the wild, 18 prompts
+# in three seconds). So the CSI and OSC prefixes stay bound, permanently, to
+# widgets that read the rest of the sequence from ZLE's own queue and keep
+# it out of the buffer. Bound keys that are longer (the arrow keys, Home,
+# bracketed paste) still win over the prefix, so nothing the user types
+# changes; an unbound CSI key, which ZLE would have mangled anyway, is
+# dropped instead.
+#
+# A resize or a screen clear moves the prompt under an open line, and the
+# anchor measured at the last prompt is stale. Re-measuring can't read the
+# tty raw here — that corrupts ZLE — but it can ASK, and the report comes
+# back through the CSI sink. The report is the caret's cell; the anchor,
+# where the buffer starts, follows from the cursor that was drawn when the
+# question was asked, and COLUMNS.
+typeset -g _sill_cpr_pending=0 _sill_cpr_cursor=0
+
+_sill_request_cpr() {
+    (( _sill_cpr_pending )) && return 0
+    (( _sill_fd >= 0 )) || return 0
+    # Not when the line is ending: the reply would arrive at the next prompt
+    # and confuse its own measurement.
+    [[ "$LASTWIDGET" == (*accept*|*send-break*|_sill_key_ret) ]] && return 0
+    _sill_cpr_pending=1
+    # This runs from the pre-redraw hook — BEFORE ZLE has drawn the current
+    # buffer, so the terminal's cursor still shows the previous state while
+    # CURSOR is already the new value. Draw first, then ask.
+    zle -R
+    _sill_cpr_cursor=$CURSOR
+    print -n -- $'\e[6n'
+    [[ -f "$HOME/.sill-grid-debug" ]] && print -r -- \
+        "$(date +%T) ${TTY##*/} in-line query sent cursor=$CURSOR cols=$COLUMNS anchor=$_sill_row,$_sill_col after=$LASTWIDGET" >> /tmp/sill-grid.log
+}
+
+_sill_end_cpr() { _sill_cpr_pending=0 }
+
+# CSI sink: "^[[" arrived and no longer binding claimed the sequence.
+_sill_csi_sink() {
+    setopt localoptions extendedglob
+    local seq="" ch
+    while read -k 1 -t 0.2 ch; do
+        seq+=$ch
+        [[ "$ch" == [A-Za-z~] ]] && break
+    done
+    if [[ "$seq" == (#b)([0-9]##)\;([0-9]##)R ]]; then
+        if (( _sill_cpr_pending )); then
+            _sill_cpr_pending=0
+            local idx=$(( (match[1] - 1) * COLUMNS + (match[2] - 1) - _sill_cpr_cursor ))
+            (( idx < 0 )) && idx=0
+            _sill_row=$(( idx / COLUMNS + 1 ))
+            _sill_col=$(( idx % COLUMNS + 1 ))
+            [[ -f "$HOME/.sill-grid-debug" ]] && print -r -- \
+                "$(date +%T) ${TTY##*/} in-line report [$seq] cursor=$_sill_cpr_cursor cols=$COLUMNS buf=[$BUFFER] → anchor=$_sill_row,$_sill_col" >> /tmp/sill-grid.log
+            _sill_last=""
+            _sill_send_buf
+        fi
+        return 0   # a report nobody asked for: a straggler, swallowed
+    fi
+    [[ -f "$HOME/.sill-grid-debug" ]] && print -r -- \
+        "$(date +%T) ${TTY##*/} CSI dropped [${seq//$'\e'/^[}]" >> /tmp/sill-grid.log
+}
+zle -N _sill_csi_sink
+bindkey '^[[' _sill_csi_sink
+
+# OSC sink: "^[]" arrived — a colour reply (or any other OSC); read to its
+# terminator (BEL, or ESC \) and keep it out of the line.
+_sill_osc_sink() {
+    local seq="" ch
+    while read -k 1 -t 0.2 ch; do
+        seq+=$ch
+        [[ "$ch" == $'\a' || "$seq" == *$'\e\\' ]] && break
+    done
+    [[ -f "$HOME/.sill-grid-debug" ]] && print -r -- \
+        "$(date +%T) ${TTY##*/} OSC dropped [${seq//$'\e'/^[}]" >> /tmp/sill-grid.log
+}
+zle -N _sill_osc_sink
+bindkey '^[]' _sill_osc_sink
 
 # --- Steering keys -----------------------------------------------------
 # Bound only while the popup is visible; each key falls back to whatever
@@ -418,6 +560,7 @@ _sill_line_init() {
 
 _sill_line_finish() {
     _sill_popup=0
+    _sill_end_cpr      # a report that never came is a straggler for the sink
     _sill_unbind_keys
     _sill_restore_keytimeout
     _sill_send "{\"t\":\"end\",\"sid\":\"$_sill_sid\"}"
