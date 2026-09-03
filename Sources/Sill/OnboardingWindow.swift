@@ -93,7 +93,7 @@ private struct OnboardingView: View {
             Spacer()
             HStack {
                 if model.step > 0 {
-                    Button("Back") { model.step -= 1 }
+                    Button(L("Back")) { model.step -= 1 }
                 }
                 Spacer()
                 nextButton
@@ -105,20 +105,20 @@ private struct OnboardingView: View {
 
     private var welcome: some View {
         page(symbol: "rectangle.and.text.magnifyingglass",
-             title: "Welcome to Sill",
-             body: "As you type a command in Terminal, iTerm2, or VS Code, Sill shows what can come next — subcommands, options, files, branches — with a short description for each. Tab or Return inserts, ↑↓ choose, Esc dismisses.")
+             title: L("Welcome to Sill"),
+             body: L("As you type a command in Terminal, iTerm2, or VS Code, Sill shows what can come next — subcommands, options, files, branches — with a short description for each. Tab or Return inserts, ↑↓ choose, Esc dismisses."))
     }
 
     private var accessibility: some View {
         VStack(spacing: 12) {
             page(symbol: "accessibility",
-                 title: "Accessibility",
-                 body: "Sill uses Accessibility for one thing: finding where you're typing so the popup appears at your cursor. Keys are handled inside your shell by the integration — nothing observes the keyboard.")
+                 title: L("Accessibility"),
+                 body: L("Sill uses Accessibility for one thing: finding where you're typing so the popup appears at your cursor. Keys are handled inside your shell by the integration — nothing observes the keyboard."))
             if model.accessibilityGranted {
-                Label("Granted", systemImage: "checkmark.circle.fill")
+                Label(L("Granted"), systemImage: "checkmark.circle.fill")
                     .foregroundStyle(.green)
             } else {
-                Button("Open System Settings…") { model.requestAccessibility() }
+                Button(L("Open System Settings…")) { model.requestAccessibility() }
             }
         }
     }
@@ -126,34 +126,34 @@ private struct OnboardingView: View {
     private var integration: some View {
         VStack(spacing: 12) {
             page(symbol: "terminal",
-                 title: "Shell integration",
-                 body: "Sill needs to see what you're typing. Installing adds a single guarded line to ~/.zshrc that streams the current command line to Sill — your file is backed up to ~/.zshrc.sill-backup first, and the switch in Settings removes it cleanly.")
+                 title: L("Shell integration"),
+                 body: L("Sill needs to see what you're typing. Installing adds a single guarded line to ~/.zshrc that streams the current command line to Sill — your file is backed up to ~/.zshrc.sill-backup first, and the switch in Settings removes it cleanly."))
             if !model.integrationAvailable {
-                Text("Run the bundled app to install the integration.")
+                Text(L("Run the bundled app to install the integration."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else if model.integrationInstalled {
-                Label("Installed", systemImage: "checkmark.circle.fill")
+                Label(L("Installed"), systemImage: "checkmark.circle.fill")
                     .foregroundStyle(.green)
             } else {
-                Button("Install") { model.installIntegration() }
+                Button(L("Install")) { model.installIntegration() }
             }
         }
     }
 
     private var finish: some View {
         page(symbol: "sparkles",
-             title: "Try it",
-             body: "Open a new terminal tab (existing tabs don't have the integration yet) and type:\n\ngit ch\n\nThe popup appears as you type. Tab or Return inserts the highlighted completion; Esc dismisses it.")
+             title: L("Try it"),
+             body: L("Open a new terminal tab (existing tabs don't have the integration yet) and type:\n\ngit ch\n\nThe popup appears as you type. Tab or Return inserts the highlighted completion; Esc dismisses it."))
     }
 
     private var nextButton: some View {
         Group {
             if model.step < 3 {
-                Button("Continue") { model.step += 1 }
+                Button(L("Continue")) { model.step += 1 }
                     .keyboardShortcut(.defaultAction)
             } else {
-                Button("Done") { model.onFinish?() }
+                Button(L("Done")) { model.onFinish?() }
                     .keyboardShortcut(.defaultAction)
             }
         }

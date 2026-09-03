@@ -209,9 +209,8 @@ private struct PopupRow: View {
                 .font(.system(size: 11))
                 .foregroundStyle(isSelected ? .white : .secondary)
                 .frame(width: 14)
-            Text(suggestion.display)
-                .font(.system(size: 12, weight: .medium, design: .monospaced))
-                .foregroundStyle(isSelected ? .white : .primary)
+            highlightedDisplay
+                .font(.system(size: 12, design: .monospaced))
                 .lineLimit(1)
             if !suggestion.aliases.isEmpty {
                 Text(suggestion.aliases.joined(separator: " "))
@@ -239,11 +238,45 @@ private struct PopupRow: View {
         .contentShape(Rectangle())
     }
 
+    /// The name with the characters the typed partial matched drawn bold in
+    /// the text colour and the rest stepped down to the secondary colour, so
+    /// the match stands out by weight and by tone. No accent tint: it lacks
+    /// contrast on the dark menu material. With nothing matched (an empty
+    /// partial) the whole name stays at full strength.
+    private var highlightedDisplay: Text {
+        let matched = Set(suggestion.matchedOffsets)
+        let strong: AnyShapeStyle = isSelected ? AnyShapeStyle(.white) : AnyShapeStyle(.primary)
+        let faint: AnyShapeStyle = matched.isEmpty ? strong
+            : isSelected ? AnyShapeStyle(.white.opacity(0.7)) : AnyShapeStyle(.secondary)
+        var pieces = Text("")
+        var run = ""
+        var runMatched = false
+        func flush() {
+            guard !run.isEmpty else { return }
+            let piece = runMatched
+                ? Text(run).bold().foregroundStyle(strong)
+                : Text(run).foregroundStyle(faint)
+            pieces = Text("\(pieces)\(piece)")   // Text's + is deprecated on macOS 26
+            run = ""
+        }
+        for (offset, character) in suggestion.display.enumerated() {
+            let isMatch = matched.contains(offset)
+            if isMatch != runMatched { flush(); runMatched = isMatch }
+            run.append(character)
+        }
+        flush()
+        return pieces
+    }
+
     private var symbolName: String {
         switch suggestion.kind {
+        case .command: return "terminal"
         case .subcommand: return "chevron.right.square"
         case .option: return "minus.square"
-        case .argument: return "textformat.abc"
+        // A value slot — branch, package, script name. Letter symbols like
+        // textformat.abc are localized (Korean draws 가나다), so a glyph
+        // without letters keeps the list identical in every language.
+        case .argument: return "tag"
         case .file: return "doc"
         case .folder: return "folder"
         }

@@ -29,7 +29,7 @@ import Testing
 
 // MARK: - Parser, against a small inline spec
 
-private let miniSpec = """
+let miniSpec = """
 var __sillSpec = { default: {
   name: "git",
   description: "Version control",
@@ -50,7 +50,7 @@ var __sillSpec = { default: {
 } };
 """
 
-private func makeParser() -> CompletionParser {
+func makeParser() -> CompletionParser {
     let engine = SpecEngine()
     let node = engine.evaluate(miniSpec)
     #expect(node != nil)
@@ -196,9 +196,10 @@ struct SpyEngine: SpecProviding {
     // Both are exact-prefix matches for "ch"; the picked one leads.
     #expect(parser.complete(buffer: "git ch", cursor: 6).suggestions.map(\.display)
         == ["cherry-pick", "checkout"])
-    // But recency never beats match quality: "chec" only matches checkout.
+    // But recency never beats match quality: "chec" is a prefix of checkout
+    // and only a loose subsequence of the picked cherry-pick.
     #expect(parser.complete(buffer: "git chec", cursor: 8).suggestions.map(\.display)
-        == ["checkout"])
+        == ["checkout", "cherry-pick"])
 }
 
 @Test func recencyStoreOrdersMostRecentFirstAndKeepsOthersStable() {
@@ -234,4 +235,64 @@ struct SpyEngine: SpecProviding {
     #expect(alias.suggestions[0].display == "pick")
     #expect(alias.suggestions[0].aliases == ["cherry-pick"])
     #expect(alias.suggestions[0].insertsNothing(before: "git pick"))
+}
+
+// MARK: - The first word: command names
+
+private struct FixedCatalog: CommandCatalogProviding {
+    var entries: [(name: String, description: String)]
+    func commands(matching prefix: String, searchPath: String) -> [(name: String, description: String)] {
+        entries.filter { $0.name.hasPrefix(prefix) }
+    }
+}
+
+@Test func firstWordOffersCommandNames() {
+    let catalog = FixedCatalog(entries: [
+        ("git", "The stupid content tracker"), ("gh", "GitHub CLI"), ("bun", "Bun runtime"),
+    ])
+    let recency = RecencyStore(defaults: nil)
+    var parser = makeParser()
+    parser.commands = catalog
+    parser.recency = recency
+
+    let g = parser.complete(buffer: "g", cursor: 1)
+    #expect(g.suggestions.map(\.display) == ["gh", "git"])   // alphabetical until used
+    #expect(g.suggestions[1].detail == "The stupid content tracker")
+    #expect(g.suggestions[1].kind == .command)
+    #expect(g.suggestions[1].insertText == "git")
+    #expect(g.suggestions[1].deleteCount == 1)
+
+    // Having completed something inside git before makes git the likelier command.
+    recency.record(command: "git", display: "checkout")
+    #expect(parser.complete(buffer: "g", cursor: 1).suggestions.map(\.display) == ["git", "gh"])
+
+    // Wrappers are stepped over; an empty prompt, paths, flags and assignments stay quiet.
+    #expect(parser.complete(buffer: "sudo g", cursor: 6).suggestions.map(\.display) == ["git", "gh"])
+    #expect(parser.complete(buffer: "", cursor: 0).suggestions.isEmpty)
+    #expect(parser.complete(buffer: "./g", cursor: 3).suggestions.isEmpty)
+    #expect(parser.complete(buffer: "-g", cursor: 2).suggestions.isEmpty)
+    #expect(parser.complete(buffer: "FOO=g", cursor: 5).suggestions.isEmpty)
+}
+
+@Test func catalogKeepsOnlyRunnableDefinitions() throws {
+    // An index with two specs; only the one on PATH (ls) or a builtin (cd) qualifies.
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent("sill-catalog-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let index: [String: Any] = [
+        "version": "t", "files": ["ls.js", "cd.js", "frobnicate.js", "aws/s3.js"],
+        "descriptions": ["ls": "List directory contents", "cd": "Change directory"],
+    ]
+    try JSONSerialization.data(withJSONObject: index).write(to: dir.appendingPathComponent("index.json"))
+
+    let catalog = CommandCatalog(specDirectories: [dir], derived: nil)
+    let names = catalog.commands(matching: "", searchPath: "/bin").map(\.name)
+    #expect(names.isEmpty)   // nothing typed, nothing offered
+    let l = catalog.commands(matching: "l", searchPath: "/bin")
+    #expect(l.map(\.name) == ["ls"])
+    #expect(l[0].description == "List directory contents")
+    #expect(catalog.commands(matching: "c", searchPath: "/bin").map(\.name) == ["cd"])
+    #expect(catalog.commands(matching: "f", searchPath: "/bin").isEmpty)   // defined, not installed
+    #expect(catalog.commands(matching: "s", searchPath: "/bin").isEmpty)   // aws/s3 is not a command
+    #expect(CommandCatalog.scan("/bin").contains("ls"))
 }

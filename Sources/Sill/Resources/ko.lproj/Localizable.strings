@@ -1,0 +1,72 @@
+/* Sill 한국어 — 영어 원문이 키입니다 (Localization.swift 참고) */
+
+/* 메뉴 */
+"Settings…" = "설정…";
+"Check for Updates…" = "업데이트 확인…";
+"Quit Sill" = "Sill 종료";
+"Close Window" = "윈도우 닫기";
+
+/* 온보딩 */
+"Welcome to Sill" = "Sill에 오신 것을 환영합니다";
+"As you type a command in Terminal, iTerm2, or VS Code, Sill shows what can come next — subcommands, options, files, branches — with a short description for each. Tab or Return inserts, ↑↓ choose, Esc dismisses." = "Terminal, iTerm2, VS Code에서 명령을 입력하는 동안 Sill이 다음에 올 수 있는 것을 보여줍니다. 서브커맨드, 옵션, 파일, 브랜치를 짧은 설명과 함께요. Tab이나 Return으로 삽입하고, ↑↓로 고르고, Esc로 닫습니다.";
+"Accessibility" = "손쉬운 사용";
+"Sill uses Accessibility for one thing: finding where you're typing so the popup appears at your cursor. Keys are handled inside your shell by the integration — nothing observes the keyboard." = "Sill은 손쉬운 사용 권한을 한 가지 일에만 씁니다. 입력 중인 위치를 찾아 커서 옆에 팝업을 띄우는 것입니다. 키 입력은 셸 통합이 셸 안에서 처리하며, 키보드를 감시하는 것은 없습니다.";
+"Granted" = "허용됨";
+"Open System Settings…" = "시스템 설정 열기…";
+"Shell integration" = "셸 통합";
+"Sill needs to see what you're typing. Installing adds a single guarded line to ~/.zshrc that streams the current command line to Sill — your file is backed up to ~/.zshrc.sill-backup first, and the switch in Settings removes it cleanly." = "Sill은 입력 중인 명령을 볼 수 있어야 합니다. 설치하면 ~/.zshrc에 보호된 한 줄이 추가되어 현재 명령줄을 Sill에 전달합니다. 먼저 ~/.zshrc.sill-backup으로 백업하고, 설정의 스위치로 깔끔하게 제거할 수 있습니다.";
+"Run the bundled app to install the integration." = "통합을 설치하려면 번들 앱을 실행하세요.";
+"Installed" = "설치됨";
+"Install" = "설치";
+"Try it" = "써 보기";
+"Open a new terminal tab (existing tabs don't have the integration yet) and type:\n\ngit ch\n\nThe popup appears as you type. Tab or Return inserts the highlighted completion; Esc dismisses it." = "새 터미널 탭을 열고(기존 탭에는 아직 통합이 없습니다) 입력해 보세요:\n\ngit ch\n\n입력하는 동안 팝업이 나타납니다. Tab이나 Return으로 선택한 항목을 삽입하고, Esc로 닫습니다.";
+"Back" = "이전";
+"Continue" = "계속";
+"Done" = "완료";
+
+/* 설정 — 사이드바 */
+"General" = "일반";
+
+/* 설정 — Completions */
+"Completions" = "자동완성";
+"Adds one line to ~/.zshrc that streams what you type to Sill. New terminal tabs pick it up; ~/.zshrc is backed up first." = "~/.zshrc에 입력 내용을 Sill로 전달하는 한 줄을 추가합니다. 새 터미널 탭부터 적용되며, ~/.zshrc는 먼저 백업합니다.";
+"Available in the bundled app only — `swift run` has no bundle to source the script from." = "번들 앱에서만 사용할 수 있습니다. `swift run`에는 스크립트를 불러올 번들이 없습니다.";
+"Complete command names" = "명령 이름 자동완성";
+"Suggest the command itself from the first letter — installed commands Sill has definitions for, with what they do." = "첫 글자부터 명령 자체를 제안합니다. 설치되어 있고 Sill에 정의가 있는 명령을 설명과 함께 보여줍니다.";
+"Grant…" = "허용…";
+"Needed only to position the popup at your cursor. Steering keys are handled by the shell integration." = "커서 위치에 팝업을 놓는 데만 필요합니다. 조작 키는 셸 통합이 처리합니다.";
+
+/* 설정 — Specs */
+"Specs" = "정의";
+"Completion specs" = "자동완성 정의";
+"Update Now" = "지금 업데이트";
+"Corpus %@" = "코퍼스 %@";
+"Not downloaded yet" = "아직 다운로드하지 않음";
+"Checked %@" = "%@ 확인함";
+"Definitions for hundreds of CLIs, from the open-source withfig/autocomplete project. Refreshed daily in the background." = "오픈 소스 withfig/autocomplete 프로젝트에서 가져온 수백 개 CLI의 정의입니다. 매일 백그라운드에서 갱신됩니다.";
+"Learn unknown commands from --help" = "모르는 명령은 --help로 익히기";
+"When a command has no spec, Sill runs it once with --help in the background and keeps what it learns on this Mac. Real programs only — shell scripts are never run." = "정의가 없는 명령은 백그라운드에서 --help로 한 번 실행해 익힌 내용을 이 Mac에 보관합니다. 실제 프로그램만 실행하며 셸 스크립트는 절대 실행하지 않습니다.";
+"Nothing learned yet" = "아직 익힌 명령 없음";
+"1 command learned" = "명령 1개 익힘";
+"%d commands learned" = "명령 %d개 익힘";
+"Forget All" = "모두 지우기";
+
+/* 설정 — App */
+"App" = "앱";
+"Launch at login" = "로그인 시 실행";
+"Available in the bundled app only." = "번들 앱에서만 사용할 수 있습니다.";
+"Hide menu bar icon" = "메뉴 막대 아이콘 가리기";
+"Version %@" = "버전 %@";
+
+/* 정의 업데이트 상태 */
+"Checking…" = "확인 중…";
+"Downloading…" = "다운로드 중…";
+"Installing…" = "설치 중…";
+"Up to date" = "최신 상태";
+"Updated to %@" = "%@(으)로 업데이트됨";
+"Spec server replied %d" = "정의 서버 응답 %d";
+"Download failed (%d)" = "다운로드 실패 (%d)";
+"Download didn't verify; kept the current specs" = "다운로드 검증에 실패해 기존 정의를 유지했습니다";
+"Couldn't unpack the spec bundle" = "정의 번들을 풀 수 없습니다";
+"No internet connection" = "인터넷에 연결되어 있지 않습니다";
+"Update failed — see Console for details" = "업데이트 실패 — 자세한 내용은 콘솔을 확인하세요";

@@ -54,7 +54,7 @@ enum ShellIntegration {
         }
         guard !isInstalled else { return }
         let fm = FileManager.default
-        var contents = (try? String(contentsOf: zshrcURL, encoding: .utf8)) ?? ""
+        let contents = (try? String(contentsOf: zshrcURL, encoding: .utf8)) ?? ""
 
         // One-time backup before the first modification.
         let backup = zshrcURL.appendingPathExtension("sill-backup")

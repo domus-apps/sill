@@ -189,13 +189,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(versionItem)
         menu.addItem(.separator())
         let settingsItem = NSMenuItem(
-            title: "Settings…", action: #selector(showSettings), keyEquivalent: ",")
+            title: L("Settings…"), action: #selector(showSettings), keyEquivalent: ",")
         settingsItem.target = self
         menu.addItem(settingsItem)
         menu.addItem(updater.makeMenuItem())
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(
-            title: "Quit Sill", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+            title: L("Quit Sill"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         return menu
     }
 
@@ -219,10 +219,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let appItem = NSMenuItem()
         let appMenu = NSMenu()
         appMenu.addItem(NSMenuItem(
-            title: "Close Window", action: #selector(NSWindow.performClose(_:)),
+            title: L("Close Window"), action: #selector(NSWindow.performClose(_:)),
             keyEquivalent: "w"))
         appMenu.addItem(NSMenuItem(
-            title: "Quit Sill", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+            title: L("Quit Sill"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         appItem.submenu = appMenu
         main.addItem(appItem)
         NSApp.mainMenu = main

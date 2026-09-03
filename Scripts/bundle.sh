@@ -14,6 +14,9 @@ cp Scripts/Info.plist "$APP/Contents/Info.plist"
 # The zsh integration ships inside the bundle; onboarding sources it from
 # here, so its path must survive app updates (it does — Resources is stable).
 cp ShellIntegration/sill.zsh "$APP/Contents/Resources/sill.zsh"
+# Localizations: SwiftPM packs the .lproj string tables into a resource
+# bundle; Localization.swift looks for it here (never via Bundle.module).
+cp -R .build/release/Sill_Sill.bundle "$APP/Contents/Resources/"
 
 # Embed Sparkle.framework (auto-update). The binary references it via
 # @rpath/../Frameworks (see Package.swift linkerSettings).

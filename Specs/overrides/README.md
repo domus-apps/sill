@@ -20,9 +20,10 @@ Two formats, one file per command, named after the command:
 
 Nested `loadSpec` files go in a subdirectory (`aws/s3.ts`), like upstream.
 
-The bundle version becomes `<upstream>+ov.<hash>` whenever this directory is
-non-empty, so a change here rolls out to users on the next build (the
-spec-bundle workflow runs on push to this directory, and weekly).
+The bundle version becomes `<upstream>+b2.ov.<hash>` whenever this directory
+is non-empty (`b2` is the bundle format), so a change here rolls out to users
+on the next build (the spec-bundle workflow runs on push to this directory,
+and weekly).
 
 Check a spec locally before pushing:
 

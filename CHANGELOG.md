@@ -4,6 +4,15 @@ All notable changes to Sill are documented here. The release workflow publishes 
 
 Keep each bullet on a single line: release notes render line breaks literally (both on GitHub and in the update dialog), so wrapped lines would break mid-sentence.
 
+## 1.2.0
+
+- Sill now speaks Korean: Settings, onboarding and the menu follow your system language.
+- Type the first letter and Sill can offer the command itself, with a line on what it does — switch on "Complete command names" in Settings.
+- Matching is fuzzy now: "chk" finds checkout and "rb" finds rebase, and the letters that matched are shown in the list. Exact and prefix matches still come first.
+- After completing a word, your terminal's syntax highlighting updates right away instead of leaving it half-coloured.
+- The list's icons no longer change with your system language.
+- The "Check for Updates" button in Settings is its own size again.
+
 ## 1.1.0
 
 - Ghostty and cmux now get completions too, alongside Terminal.app, iTerm2 and VS Code.

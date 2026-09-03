@@ -10,7 +10,7 @@ enum SettingsPane: Int, CaseIterable {
 
     var title: String {
         switch self {
-        case .general: "General"
+        case .general: L("General")
         }
     }
 
@@ -312,7 +312,7 @@ final class SettingsModel: ObservableObject {
     }
 
     var specVersionLabel: String {
-        SpecStore.installedVersion.map { "Corpus \($0)" } ?? "Not downloaded yet"
+        SpecStore.installedVersion.map { L("Corpus %@", $0) } ?? L("Not downloaded yet")
     }
 
     var specStatus: SpecStore.Status { specStore.status }
@@ -322,7 +322,7 @@ final class SettingsModel: ObservableObject {
         guard let date = SpecStore.lastCheck else { return nil }
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .full
-        return "Checked \(formatter.localizedString(for: date, relativeTo: Date()))"
+        return L("Checked %@", formatter.localizedString(for: date, relativeTo: Date()))
     }
 
     func updateSpecs() {
@@ -333,9 +333,9 @@ final class SettingsModel: ObservableObject {
 
     var learnedLabel: String {
         switch learnedCount {
-        case 0: "Nothing learned yet"
-        case 1: "1 command learned"
-        case let n: "\(n) commands learned"
+        case 0: L("Nothing learned yet")
+        case 1: L("1 command learned")
+        case let n: L("%d commands learned", n)
         }
     }
 
@@ -368,35 +368,45 @@ struct GeneralSettingsView: View {
             Section {
                 VStack(alignment: .leading, spacing: 3) {
                     Toggle(
-                        "Shell integration",
+                        L("Shell integration"),
                         isOn: model.binding({ model.integrationInstalled },
                                             { _ in model.toggleIntegration() })
                     )
                     .disabled(!model.integrationAvailable)
                     Text(model.integrationAvailable
-                        ? "Adds one line to ~/.zshrc that streams what you type to Sill. New terminal tabs pick it up; ~/.zshrc is backed up first."
-                        : "Available in the bundled app only — `swift run` has no bundle to source the script from.")
+                        ? L("Adds one line to ~/.zshrc that streams what you type to Sill. New terminal tabs pick it up; ~/.zshrc is backed up first.")
+                        : L("Available in the bundled app only — `swift run` has no bundle to source the script from."))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                VStack(alignment: .leading, spacing: 3) {
+                    Toggle(
+                        L("Complete command names"),
+                        isOn: model.binding({ AppPreferences.completesCommandNames },
+                                            { AppPreferences.completesCommandNames = $0 })
+                    )
+                    Text(L("Suggest the command itself from the first letter — installed commands Sill has definitions for, with what they do."))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
                 VStack(alignment: .leading, spacing: 3) {
                     HStack {
-                        Text("Accessibility")
+                        Text(L("Accessibility"))
                         Spacer()
                         if model.accessibilityGranted {
-                            Label("Granted", systemImage: "checkmark.circle.fill")
+                            Label(L("Granted"), systemImage: "checkmark.circle.fill")
                                 .foregroundStyle(.green)
                                 .labelStyle(.titleAndIcon)
                         } else {
-                            Button("Grant…") { model.requestAccessibility() }
+                            Button(L("Grant…")) { model.requestAccessibility() }
                         }
                     }
-                    Text("Needed only to position the popup at your cursor. Steering keys are handled by the shell integration.")
+                    Text(L("Needed only to position the popup at your cursor. Steering keys are handled by the shell integration."))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             } header: {
-                Text("Completions")
+                Text(L("Completions"))
             }
 
             Section {
@@ -404,7 +414,7 @@ struct GeneralSettingsView: View {
                     /* The button stays put (disabled while busy) and the
                        spinner joins it, so the row never changes height. */
                     HStack {
-                        Text("Completion specs")
+                        Text(L("Completion specs"))
                         Spacer()
                         Text(model.specStatus.isBusy ? model.specStatus.label : model.specVersionLabel)
                             .foregroundStyle(.secondary)
@@ -412,7 +422,7 @@ struct GeneralSettingsView: View {
                             ProgressView()
                                 .controlSize(.small)
                         }
-                        Button("Update Now") { model.updateSpecs() }
+                        Button(L("Update Now")) { model.updateSpecs() }
                             .disabled(model.specStatus.isBusy)
                     }
                     /* Outcome of the last attempt — success, "already
@@ -437,17 +447,17 @@ struct GeneralSettingsView: View {
                     }
                     .font(.caption)
                     .frame(height: 14)
-                    Text("Definitions for hundreds of CLIs, from the open-source withfig/autocomplete project. Refreshed daily in the background.")
+                    Text(L("Definitions for hundreds of CLIs, from the open-source withfig/autocomplete project. Refreshed daily in the background."))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
                 VStack(alignment: .leading, spacing: 3) {
                     Toggle(
-                        "Learn unknown commands from --help",
+                        L("Learn unknown commands from --help"),
                         isOn: model.binding({ AppPreferences.learnsFromHelp },
                                             { AppPreferences.learnsFromHelp = $0 })
                     )
-                    Text("When a command has no spec, Sill runs it once with --help in the background and keeps what it learns on this Mac. Real programs only — shell scripts are never run.")
+                    Text(L("When a command has no spec, Sill runs it once with --help in the background and keeps what it learns on this Mac. Real programs only — shell scripts are never run."))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     HStack {
@@ -455,44 +465,45 @@ struct GeneralSettingsView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Spacer()
-                        Button("Forget All") { model.forgetLearned() }
+                        Button(L("Forget All")) { model.forgetLearned() }
                             .controlSize(.small)
                             .disabled(model.learnedCount == 0)
                     }
                     .padding(.top, 2)
                 }
             } header: {
-                Text("Specs")
+                Text(L("Specs"))
             }
 
             Section {
                 VStack(alignment: .leading, spacing: 3) {
                     Toggle(
-                        "Launch at login",
+                        L("Launch at login"),
                         isOn: model.binding({ model.launchAtLogin }, { model.launchAtLogin = $0 })
                     )
                     .disabled(!model.isBundledApp)
                     if !model.isBundledApp {
-                        Text("Available in the bundled app only.")
+                        Text(L("Available in the bundled app only."))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                 }
                 Toggle(
-                    "Hide menu bar icon",
+                    L("Hide menu bar icon"),
                     isOn: model.binding({ AppPreferences.isMenuBarIconHidden },
                                         { AppPreferences.isMenuBarIconHidden = $0 })
                 )
             } header: {
-                Text("App")
+                Text(L("App"))
             }
 
             Section {
                 HStack {
-                    Text("Version \(model.versionLabel)")
+                    Text(L("Version %@", model.versionLabel))
                         .foregroundStyle(.secondary)
                     Spacer()
                     CheckForUpdatesButton(updater: model.updater)
+                        .fixedSize()   // its own width, not the row's remainder
                 }
             }
         }

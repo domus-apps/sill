@@ -3,7 +3,7 @@ import Foundation
 /// One completion the popup can offer.
 struct Suggestion: Equatable {
     enum Kind {
-        case subcommand, option, argument, file, folder
+        case command, subcommand, option, argument, file, folder
     }
 
     var display: String
@@ -17,8 +17,12 @@ struct Suggestion: Equatable {
     /// shown dimly beside the display name.
     var aliases: [String] = []
     var priority: Int = 50
-    /// Match quality, for ranking: 3 exact-case prefix, 2 prefix, 1 substring.
+    /// Match quality, for ranking — FuzzyMatcher.Match.rank (tier first,
+    /// then the fuzzy score).
     var score: Int = 0
+    /// Characters of `display` the typed partial accounts for; the row
+    /// highlights them so a fuzzy hit explains itself.
+    var matchedOffsets: [Int] = []
 }
 
 extension Suggestion {
@@ -149,6 +153,8 @@ struct CompletionParser {
     let engine: any SpecProviding
     /// Picks the user made before, per command — orders equal matches.
     var recency: RecencyStore? = nil
+    /// Command names to offer while the first word is being typed.
+    var commands: (any CommandCatalogProviding)? = nil
 
     /// The simple command under the caret: the rightmost command of a
     /// pipeline/list, minus leading environment assignments and wrappers
@@ -166,10 +172,13 @@ struct CompletionParser {
         return tokens
     }
 
-    func complete(buffer: String, cursor: Int) -> CompletionResult {
+    func complete(buffer: String, cursor: Int, searchPath: String = "") -> CompletionResult {
         let prefix = String(buffer.prefix(cursor))
         var tokens = Self.commandTokens(of: prefix)
 
+        if tokens.count == 1 {
+            return commandName(tokens[0], searchPath: searchPath)
+        }
         guard tokens.count >= 2 else { return CompletionResult(suggestions: []) }
         let commandName = (tokens[0].text as NSString).lastPathComponent
         guard let root = engine.spec(for: commandName) else {
@@ -287,6 +296,24 @@ struct CompletionParser {
             suggestions: rank(suggestions, partial: partial.text, command: commandName)))
     }
 
+    /* The first word: the command itself. Offered once something is typed
+       (an empty prompt stays quiet), and only for a plain name — a path, a
+       flag or an assignment is the shell's business. Recency is recorded
+       under the empty command key; picks made *inside* a command count too,
+       so the commands actually used here rise above alphabetical order. */
+    private func commandName(_ partial: Token, searchPath: String) -> CompletionResult {
+        guard let commands, !partial.text.isEmpty, !partial.text.hasPrefix("-"),
+              !partial.text.contains("/"), !partial.text.contains("=")
+        else { return CompletionResult(suggestions: []) }
+        let suggestions = commands.commands(matching: partial.text, searchPath: searchPath)
+            .map { entry in
+                Suggestion(display: entry.name, insertText: entry.name,
+                           deleteCount: partial.typedLength, detail: entry.description,
+                           kind: .command)
+            }
+        return CompletionResult(suggestions: rank(suggestions, partial: partial.text, command: ""))
+    }
+
     private func argSuggestions(for arg: SpecNode, partial: Token,
                                 command: String) -> CompletionResult {
         var suggestions = arg.staticSuggestions.map { entry in
@@ -321,16 +348,13 @@ struct CompletionParser {
         guard !names.isEmpty else { return nil }
         let longest: ([String]) -> String? = { $0.max { $0.count < $1.count } }
         if partial.isEmpty { return longest(names) }
-        let lower = partial.lowercased()
         // Within the best-matching tier, prefer the canonical (longest)
         // alias: "bun i" should read "install", not "i".
-        for tier in [names.filter { $0.hasPrefix(partial) },
-                     names.filter { $0.lowercased().hasPrefix(lower) },
-                     names.filter { $0.lowercased().contains(lower) }]
-        where !tier.isEmpty {
-            return longest(tier)
+        let matched = names.compactMap { name in
+            FuzzyMatcher.match(partial, in: name).map { (name: name, tier: $0.tier) }
         }
-        return nil
+        guard let bestTier = matched.map(\.tier).max() else { return nil }
+        return longest(matched.filter { $0.tier == bestTier }.map(\.name))
     }
 
     /// fig's insertValue may carry a `{cursor}` placeholder; v1 inserts the
@@ -343,23 +367,18 @@ struct CompletionParser {
     private func rank(_ suggestions: [Suggestion], partial: String,
                       command: String) -> [Suggestion] {
         var scored: [Suggestion] = suggestions.compactMap { suggestion in
+            guard let match = FuzzyMatcher.match(partial, in: suggestion.display) else { return nil }
             var s = suggestion
-            if partial.isEmpty {
-                s.score = 2
-            } else if s.display.hasPrefix(partial) {
-                s.score = 3
-            } else if s.display.lowercased().hasPrefix(partial.lowercased()) {
-                s.score = 2
-            } else if s.display.lowercased().contains(partial.lowercased()) {
-                s.score = 1
-            } else {
-                return nil
-            }
+            s.score = match.rank
+            s.matchedOffsets = match.offsets
             return s
         }
         let recent: (Suggestion) -> Double = { [recency] s in
-            recency?.lastUse(command: command, display: s.display)?.timeIntervalSince1970
-                ?? -Double.infinity
+            var last = recency?.lastUse(command: command, display: s.display)
+            if command.isEmpty, let inside = recency?.lastUse(command: s.display) {
+                last = max(last ?? .distantPast, inside)
+            }
+            return last?.timeIntervalSince1970 ?? -Double.infinity
         }
         scored.sort {
             if $0.score != $1.score { return $0.score > $1.score }

@@ -33,9 +33,7 @@ enum TemplateResolver {
 
         return entries.compactMap { url -> Suggestion? in
             let name = url.lastPathComponent
-            guard componentPrefix.isEmpty
-                || name.lowercased().hasPrefix(componentPrefix.lowercased())
-            else { return nil }
+            guard let match = FuzzyMatcher.match(componentPrefix, in: name) else { return nil }
             let isDirectory =
                 (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
             if foldersOnly && !isDirectory { return nil }
@@ -46,9 +44,12 @@ enum TemplateResolver {
                 deleteCount: partial.typedLength,
                 detail: "",
                 kind: isDirectory ? .folder : .file,
-                score: 2)
+                score: match.rank,
+                matchedOffsets: match.offsets)
         }
-        .sorted { ($0.kind == .folder ? 0 : 1, $0.display) < ($1.kind == .folder ? 0 : 1, $1.display) }
+        // Folders first, then how well the name matches, then the name.
+        .sorted { ($0.kind == .folder ? 0 : 1, -$0.score, $0.display)
+                  < ($1.kind == .folder ? 0 : 1, -$1.score, $1.display) }
     }
 
     static func shellEscaped(_ value: String) -> String {
@@ -310,11 +311,22 @@ final class GeneratorRunner {
 
     /// Case-insensitive prefix filter on the display name; an empty query
     /// keeps everything except dotfiles.
+    /// Generator output narrowed to the typed partial (same tiers as every
+    /// other list), best matches first and the generator's own order kept
+    /// among equals. With nothing typed, dotfiles stay out of the way.
     static func matching(_ suggestions: [Suggestion], query: String) -> [Suggestion] {
-        suggestions.filter { s in
-            if query.isEmpty { return !s.display.hasPrefix(".") }
-            return s.display.lowercased().hasPrefix(query.lowercased())
+        if query.isEmpty { return suggestions.filter { !$0.display.hasPrefix(".") } }
+        let scored = suggestions.enumerated().compactMap { index, s -> (Suggestion, Int)? in
+            guard let match = FuzzyMatcher.match(query, in: s.display) else { return nil }
+            var s = s
+            s.score = match.rank
+            s.matchedOffsets = match.offsets
+            return (s, index)
         }
+        return scored.sorted { a, b in
+            if a.0.score != b.0.score { return a.0.score > b.0.score }
+            return a.1 < b.1
+        }.map(\.0)
     }
 
     /// The `executeShellCommand` a custom generator receives: accepts the

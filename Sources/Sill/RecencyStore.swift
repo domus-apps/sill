@@ -24,6 +24,14 @@ final class RecencyStore {
         uses[Self.id(command, display)].map { Date(timeIntervalSince1970: $0) }
     }
 
+    /// The most recent pick made anywhere under `command` — evidence that
+    /// the command is one the user actually runs.
+    func lastUse(command: String) -> Date? {
+        let prefix = command + "\u{1F}"
+        let latest = uses.filter { $0.key.hasPrefix(prefix) }.map(\.value).max()
+        return latest.map { Date(timeIntervalSince1970: $0) }
+    }
+
     func record(command: String, display: String) {
         uses[Self.id(command, display)] = Date().timeIntervalSince1970
         if uses.count > Self.limit {

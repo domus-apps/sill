@@ -10,8 +10,15 @@
 		<string>terminal autocomplete</string>
 		<string>completion</string>
 	</array>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
 	<key>CFBundleExecutable</key>
 	<string>Sill</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>en</string>
+		<string>ko</string>
+	</array>
 	<key>CFBundleIdentifier</key>
 	<string>com.jhaemin.sill</string>
 	<key>CFBundleName</key>

@@ -10,9 +10,12 @@ if let index = CommandLine.arguments.firstIndex(of: "--complete"),
     if let dir = ProcessInfo.processInfo.environment["SILL_SPEC_DIR"] {
         directories.append(URL(fileURLWithPath: dir))
     }
-    let engine = SpecEngine(specDirectories: directories, derived: DerivedSpecStore())
-    let result = CompletionParser(engine: engine)
-        .complete(buffer: buffer, cursor: buffer.count)
+    let derived = DerivedSpecStore()
+    let engine = SpecEngine(specDirectories: directories, derived: derived)
+    let result = CompletionParser(
+        engine: engine, commands: CommandCatalog(specDirectories: directories, derived: derived))
+        .complete(buffer: buffer, cursor: buffer.count,
+                  searchPath: ProcessInfo.processInfo.environment["PATH"] ?? "")
     for s in result.suggestions {
         print("\(s.display)\t\(s.kind)\t\(s.detail.prefix(72))")
     }

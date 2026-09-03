@@ -10,7 +10,8 @@ final class CompletionController {
     private let server: SocketServer
     private let engine: SpecEngine
     private let derived: DerivedSpecStore
-    private let parser: CompletionParser
+    private let commandCatalog: CommandCatalog
+    private var parser: CompletionParser
     private let generators = GeneratorRunner()
     private let recency = RecencyStore()
     private let popup = PopupPanel()
@@ -38,6 +39,7 @@ final class CompletionController {
         self.server = server
         self.derived = derived
         engine = SpecEngine(specDirectories: specDirectories, derived: derived)
+        commandCatalog = CommandCatalog(specDirectories: specDirectories, derived: derived)
         parser = CompletionParser(engine: engine, recency: recency)
 
         // A spec learned from --help just landed: the list for the buffer
@@ -97,7 +99,10 @@ final class CompletionController {
         generation += 1
         let currentGeneration = generation
 
-        let result = parser.complete(buffer: session.buffer, cursor: session.cursor)
+        // First-word completion is a preference; honour it as of this keystroke.
+        parser.commands = AppPreferences.completesCommandNames ? commandCatalog : nil
+        let result = parser.complete(buffer: session.buffer, cursor: session.cursor,
+                                     searchPath: session.searchPath)
         if AppPreferences.learnsFromHelp {
             if let unknown = result.unknownCommand {
                 derived.ensure(command: unknown, searchPath: session.searchPath)

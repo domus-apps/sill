@@ -3,6 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "Sill",
+    defaultLocalization: "en",
     /* macOS 26+ renders apps linked against an older SDK in the legacy
        compatibility design (old-style traffic lights, pre-Liquid Glass
        chrome). This toolchain stamps the binary's LC_BUILD_VERSION sdk field

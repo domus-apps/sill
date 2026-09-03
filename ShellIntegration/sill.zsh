@@ -282,6 +282,11 @@ _sill_reply_handler() {
 _sill_apply() {
     (( _sill_pending_del > 0 )) && LBUFFER=${LBUFFER[1,-($_sill_pending_del+1)]}
     LBUFFER+="$_sill_pending_text"
+    # Highlighters (zsh-syntax-highlighting, fast-syntax-highlighting) recolour
+    # from the pre-redraw hook, which the redraw below doesn't run — left
+    # alone they'd keep the colours of the text as it was before the edit,
+    # so the completed word shows half-painted. Ask them directly.
+    (( $+functions[_zsh_highlight] )) && _zsh_highlight
     # Buffer edits made from a `zle -F` handler are NOT repainted until the
     # next keystroke — force the refresh, or the insertion stays invisible.
     zle -R

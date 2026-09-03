@@ -7,6 +7,7 @@ enum AppPreferences {
 
     private static let hideMenuBarIconKey = "pref.hideMenuBarIcon"
     private static let learnFromHelpKey = "pref.learnFromHelp"
+    private static let completeCommandNamesKey = "pref.completeCommandNames"
 
     static var isMenuBarIconHidden: Bool {
         get { UserDefaults.standard.bool(forKey: hideMenuBarIconKey) }
@@ -18,6 +19,14 @@ enum AppPreferences {
     static var learnsFromHelp: Bool {
         get { UserDefaults.standard.bool(forKey: learnFromHelpKey) }
         set { set(newValue, forKey: learnFromHelpKey) }
+    }
+
+    /// Offer the command itself from the first letter typed (off by
+    /// default: a popup on every prompt is a lot of motion for a word most
+    /// people type without help).
+    static var completesCommandNames: Bool {
+        get { UserDefaults.standard.bool(forKey: completeCommandNamesKey) }
+        set { set(newValue, forKey: completeCommandNamesKey) }
     }
 
     private static func set(_ value: Bool, forKey key: String) {

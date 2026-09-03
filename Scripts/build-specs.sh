@@ -69,9 +69,33 @@ if (( ${#OVERRIDE_FILES[@]} > 0 )); then
             --log-level=error --outbase="$OVERRIDES" --outdir="$OUT" "${MODULES[@]}"
     fi
     OVHASH=$(cat "${OVERRIDE_FILES[@]}" | shasum -a 256 | cut -c1-8)
-    ACTUAL="$ACTUAL+ov.$OVHASH"
-    echo "${#OVERRIDE_FILES[@]} overrides → $ACTUAL"
+    OVERRIDE_TAG=".ov.$OVHASH"
+    echo "${#OVERRIDE_FILES[@]} overrides"
 fi
+
+# The bundle's own format version: bump when index.json gains something the
+# app needs (b2: per-command descriptions), so installed corpora that carry
+# the same upstream version still re-download.
+ACTUAL="$ACTUAL+b2${OVERRIDE_TAG:-}"
+echo "bundle version $ACTUAL"
+
+# Each spec's one-line description, for completing the command name itself.
+# The converted files are plain scripts, so evaluate them and read
+# `default.description`; a spec that fails to evaluate simply has none.
+if command -v node > /dev/null; then JS=node; else JS=bun; fi
+"$JS" - "$OUT" > "$OUT/descriptions.json" <<'JSEOF'
+const fs = require("fs"), path = require("path");
+const out = process.argv[2], result = {};
+for (const file of fs.readdirSync(out)) {
+    if (!file.endsWith(".js")) continue;
+    try {
+        const spec = new Function(fs.readFileSync(path.join(out, file), "utf8") + "; return __sillSpec;")();
+        const d = spec && spec.default && spec.default.description;
+        if (typeof d === "string" && d) result[file.slice(0, -3)] = d.replace(/\s+/g, " ").trim().slice(0, 200);
+    } catch (e) {}
+}
+process.stdout.write(JSON.stringify(result));
+JSEOF
 
 python3 - "$OUT" "$ACTUAL" "$OVERRIDES" <<'PY'
 import json, os, sys
@@ -83,9 +107,14 @@ overridden = sorted(
     os.path.splitext(os.path.relpath(os.path.join(root, f), overrides))[0]
     for root, _, names in os.walk(overrides) for f in names
     if f.endswith((".ts", ".js", ".json"))) if os.path.isdir(overrides) else []
+descriptions_path = os.path.join(out, "descriptions.json")
+with open(descriptions_path) as fh:
+    descriptions = json.load(fh)
+os.remove(descriptions_path)
 with open(os.path.join(out, "index.json"), "w") as fh:
-    json.dump({"version": version, "files": files, "overrides": overridden}, fh)
-print(f"{len(files)} specs")
+    json.dump({"version": version, "files": files, "overrides": overridden,
+               "descriptions": descriptions}, fh)
+print(f"{len(files)} specs, {len(descriptions)} with descriptions")
 PY
 
 (cd build && zip -qr specs.zip specs)

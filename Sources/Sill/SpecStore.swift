@@ -31,11 +31,11 @@ final class SpecStore {
         var label: String {
             switch self {
             case .idle: return ""
-            case .checking: return "Checking…"
-            case .downloading: return "Downloading…"
-            case .installing: return "Installing…"
-            case .upToDate: return "Up to date"
-            case .updated(let version): return "Updated to \(version)"
+            case .checking: return L("Checking…")
+            case .downloading: return L("Downloading…")
+            case .installing: return L("Installing…")
+            case .upToDate: return L("Up to date")
+            case .updated(let version): return L("Updated to %@", version)
             case .failed(let reason): return reason
             }
         }
@@ -118,7 +118,7 @@ final class SpecStore {
         do {
             let (manifestData, manifestResponse) = try await URLSession.shared.data(from: manifestURL)
             if let http = manifestResponse as? HTTPURLResponse, http.statusCode != 200 {
-                return .failed("Spec server replied \(http.statusCode)")
+                return .failed(L("Spec server replied %d", http.statusCode))
             }
             let manifest = try JSONDecoder().decode(Manifest.self, from: manifestData)
             UserDefaults.standard.set(Date(), forKey: checkedKey)
@@ -130,11 +130,11 @@ final class SpecStore {
             report(.downloading)
             let (zipURL, zipResponse) = try await URLSession.shared.download(from: bundleURL)
             if let http = zipResponse as? HTTPURLResponse, http.statusCode != 200 {
-                return .failed("Download failed (\(http.statusCode))")
+                return .failed(L("Download failed (%d)", http.statusCode))
             }
             guard sha256Hex(of: zipURL) == manifest.sha256 else {
                 NSLog("Sill: spec bundle checksum mismatch — keeping the current corpus")
-                return .failed("Download didn't verify; kept the current specs")
+                return .failed(L("Download didn't verify; kept the current specs"))
             }
 
             report(.installing)
@@ -150,7 +150,7 @@ final class SpecStore {
             try ditto.run()
             ditto.waitUntilExit()
             guard ditto.terminationStatus == 0 else {
-                return .failed("Couldn't unpack the spec bundle")
+                return .failed(L("Couldn't unpack the spec bundle"))
             }
             // The zip contains a top-level "specs" folder.
             let extracted = staging.appendingPathComponent("specs")
@@ -162,10 +162,10 @@ final class SpecStore {
             NSLog("Sill: spec corpus updated to %@", manifest.version)
             return .updated(manifest.version)
         } catch let error as URLError where error.code == .notConnectedToInternet {
-            return .failed("No internet connection")
+            return .failed(L("No internet connection"))
         } catch {
             NSLog("Sill: spec update failed: \(error.localizedDescription)")
-            return .failed("Update failed — see Console for details")
+            return .failed(L("Update failed — see Console for details"))
         }
     }
 
