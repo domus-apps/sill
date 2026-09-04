@@ -127,5 +127,31 @@
         sparkle:edSignature="YbGcJ4EpxBO7WT8jIjMOYDQyuXTgvb87ANtYZhT9P7AtzeX1ljPBoIHLxMusrEHqJlF6g/mjwRzmd9hxQvmrBA==" length="3201462"
         type="application/octet-stream"/>
     </item>
+    <item>
+      <title>Sill v1.4.0</title>
+      <link>https://github.com/domus-apps/sill/releases/tag/v1.4.0</link>
+      <pubDate>Fri, 04 Sep 2026 00:04:56 +0000</pubDate>
+      <description xml:lang="en"><![CDATA[
+<ul>
+<li>Completing a folder no longer adds a trailing slash; typing one lists what is inside.</li>
+<li>If the highlighted item is exactly what you typed, Return runs the command. <code class="notranslate">ls</code> runs even with <code class="notranslate">lsof</code> in the list.</li>
+<li>Typing an alias puts its command first: <code class="notranslate">npm i</code> lists install above info and init.</li>
+<li>Fixed a stray space after some completions.</li>
+</ul>      ]]></description>
+      <description xml:lang="ko"><![CDATA[
+<ul>
+<li>폴더를 완성해도 끝에 슬래시를 붙이지 않으며, 슬래시를 입력하여 그 안의 목록을 볼 수 있습니다.</li>
+<li>강조된 항목이 입력한 것과 같으면 Return이 명령을 실행합니다. 목록에 <code class="notranslate">lsof</code>가 있어도 <code class="notranslate">ls</code>는 바로 실행됩니다.</li>
+<li>별칭을 입력하면 그 명령이 맨 위에 옵니다. <code class="notranslate">npm i</code>에서 install이 info, init보다 위에 옵니다.</li>
+<li>일부 완성 뒤에 공백이 붙던 문제를 고쳤습니다.</li>
+</ul>      ]]></description>
+      <sparkle:version>5</sparkle:version>
+      <sparkle:shortVersionString>1.4.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <enclosure
+        url="https://github.com/domus-apps/sill/releases/download/v1.4.0/Sill.zip"
+        sparkle:edSignature="FNKjcH5mDWZhV4k17UtOZHNjsAMRhOqI0uqTFi06u7Hluw7Rx3/SsV0oU5fTrfkKuQUYOKFD9OGkJr71IcQ/BQ==" length="3202375"
+        type="application/octet-stream"/>
+    </item>
   </channel>
 </rss>
