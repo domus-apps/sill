@@ -79,6 +79,8 @@ final class CompletionController {
     }
 
     func lineEnded(_ session: Session) {
+        xtermLineOrigin[session.sid] = nil   // the next prompt may be elsewhere
+        xtermSettledRead[session.sid] = nil
         hide()
     }
 
@@ -101,6 +103,9 @@ final class CompletionController {
         }
         generation += 1
         let currentGeneration = generation
+        cursorDeltaForGeneration = session.cursor - (lastReportedCursor[session.sid] ?? session.cursor)
+        lastReportedCursor[session.sid] = session.cursor
+        lastReportAt = CFAbsoluteTimeGetCurrent()
 
         // First-word completion is a preference; honour it as of this keystroke.
         parser.commands = AppPreferences.completesCommandNames ? commandCatalog : nil
@@ -178,6 +183,70 @@ final class CompletionController {
 
     private func currentSuggestions() -> [Suggestion] { presented }
 
+    /* xterm.js (VS Code) reports the caret where the terminal has DRAWN it,
+       and the shell tells Sill about a keystroke before it even writes the
+       echo the terminal will draw. So at the moment the buffer arrives the
+       caret read is exactly one edit behind — the popup would open at the
+       previous cell and hop over when the watchdog looks again. Waiting does
+       not help reliably (Chromium updates its accessibility tree on its own
+       schedule), but the edit itself is known: the cursor moved from where
+       it was at the previous report to where it is now, and the caret
+       element is one cell wide. Shift the read by that many cells. The cell
+       width is refined from two settled reads on one row, since the element's
+       width is rounded. Native terminals answer with the caret in place and
+       are left alone. */
+    private var cursorDeltaForGeneration = 0
+    private var lastReportedCursor: [String: Int] = [:]
+    private var lastReportAt = CFAbsoluteTime(0)
+    private var xtermCellWidth: [String: CGFloat] = [:]
+    private var xtermSettledRead: [String: (x: CGFloat, y: CGFloat, cursor: Int)] = [:]
+    /* Where cursor 0 of the line being edited sits on its row. Once known,
+       every keystroke on that row is placed by arithmetic alone — the read
+       is a keystroke or more behind while typing runs ahead of the drawing,
+       and following it would make the popup shake. Learned from the first
+       shifted read, corrected by settled ones, forgotten with the line. */
+    private var xtermLineOrigin: [String: (x0: CGFloat, y: CGFloat)] = [:]
+    /// Reads this long after the last keystroke show the caret as drawn.
+    private static let xtermSettleTime: CFAbsoluteTime = 0.2
+    /// One placement per buffer state: a generator answering later must not
+    /// re-read a caret that has since been drawn and shift it a second time.
+    private var placementGeneration = -1
+    private var placementForGeneration: CaretLocator.Placement?
+
+    private func locateForPresent(_ session: Session) -> CaretLocator.Placement? {
+        if placementGeneration == generation { return placementForGeneration }
+        var placement = CaretLocator.locate(for: session)
+        if session.term == "vscode", var found = placement, found.precise {
+            let cell = xtermCellWidth[session.sid] ?? found.rect.width
+            if let origin = xtermLineOrigin[session.sid], abs(origin.y - found.rect.minY) < 1 {
+                found.rect.origin.x = origin.x0 + CGFloat(session.cursor) * cell
+            } else {
+                found.rect.origin.x += CGFloat(cursorDeltaForGeneration) * cell
+                xtermLineOrigin[session.sid] = (found.rect.minX - CGFloat(session.cursor) * cell,
+                                                found.rect.minY)
+            }
+            placement = found
+        }
+        placementGeneration = generation
+        placementForGeneration = placement
+        return placement
+    }
+
+    /// A read taken while nothing was being typed is the drawn caret: use
+    /// two of them on one row to learn the real cell width.
+    private func noteSettledRead(_ placement: CaretLocator.Placement, for session: Session) {
+        guard session.term == "vscode", placement.precise else { return }
+        let x = placement.rect.minX, y = placement.rect.minY
+        if let previous = xtermSettledRead[session.sid], abs(previous.y - y) < 1,
+           previous.cursor != session.cursor {
+            let width = (x - previous.x) / CGFloat(session.cursor - previous.cursor)
+            if width > 3, width < 30 { xtermCellWidth[session.sid] = width }
+        }
+        xtermSettledRead[session.sid] = (x, y, session.cursor)
+        let cell = xtermCellWidth[session.sid] ?? placement.rect.width
+        xtermLineOrigin[session.sid] = (x - CGFloat(session.cursor) * cell, y)
+    }
+
     private func present(_ suggestions: [Suggestion], for session: Session, loading: Bool = false) {
         /* The word is finished: one suggestion left and it is exactly what
            has been typed. There is nothing to complete, so stay out of the
@@ -189,7 +258,7 @@ final class CompletionController {
             return
         }
         guard !suggestions.isEmpty || loading, sessions.activeSession === session,
-              let placement = CaretLocator.locate(for: session)
+              let placement = locateForPresent(session)
         else {
             hide()
             return
@@ -227,13 +296,23 @@ final class CompletionController {
             [weak self] _ in
             guard let self, popup.isVisible, let shown = shownPlacement else { return }
             guard let session = sessions.activeSession,
-                  let now = CaretLocator.locate(for: session), now.precise == shown.precise,
+                  let now = CaretLocator.locate(for: session)
+            else {
+                hide()
+                return
+            }
+            // While typing runs ahead of VS Code's drawing, its reads trail
+            // the placement by design; judge them only once they have caught up.
+            if session.term == "vscode",
+               CFAbsoluteTimeGetCurrent() - lastReportAt < Self.xtermSettleTime { return }
+            guard now.precise == shown.precise,
                   abs(now.rect.minY - shown.rect.minY) < 2,      // same line
                   abs(now.rect.minX - shown.rect.minX) < 240     // not a window move
             else {
                 hide()
                 return
             }
+            noteSettledRead(now, for: session)
             // The caret drifted a few cells on the same line — the terminal
             // repainted after we placed the popup, or the user moved the
             // cursor. Follow it instead of blinking.
@@ -260,17 +339,36 @@ final class CompletionController {
 
     // MARK: - Keys (from the shell's ZLE widgets)
 
+    /* An arrow tapped at the end of the list wraps round; an arrow HELD
+       there stops, or the selection would race round the list until the key
+       is let go. The shell reports key presses, not repeats, so the two are
+       told apart by pace: repeats arrive at the system's key-repeat interval,
+       taps a good deal slower. */
+    private var lastArrow: (key: String, at: CFAbsoluteTime)?
+
+    static func arrowWraps(sinceLast interval: CFAbsoluteTime?, repeatInterval: TimeInterval) -> Bool {
+        guard let interval else { return true }
+        return interval > repeatInterval * 2
+    }
+
+    private func arrow(_ key: String, delta: Int) {
+        let now = CFAbsoluteTimeGetCurrent()
+        let since = lastArrow.flatMap { $0.key == key ? now - $0.at : nil }
+        lastArrow = (key, now)
+        popup.moveSelection(by: delta, wrapping: Self.arrowWraps(
+            sinceLast: since, repeatInterval: NSEvent.keyRepeatInterval))
+        sendPopupState()  // navigated → Return may insert now
+    }
+
     func keyPressed(_ key: String, from client: SocketServer.ClientID) {
         guard popup.isVisible, client == popupClient,
               let session = sessions[client]
         else { return }
         switch key {
         case "up":
-            popup.moveSelection(by: -1)
-            sendPopupState()  // navigated → Return may insert now
+            arrow(key, delta: -1)
         case "down":
-            popup.moveSelection(by: 1)
-            sendPopupState()
+            arrow(key, delta: 1)
         case "tab":
             if let suggestion = popup.selectedSuggestion {
                 acceptInto(session, suggestion)

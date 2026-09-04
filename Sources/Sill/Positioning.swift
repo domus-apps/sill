@@ -42,16 +42,33 @@ enum CaretLocator {
         }
 
         var focusedValue: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(
-            appElement, kAXFocusedUIElementAttribute as CFString, &focusedValue) == .success,
-            let focused = focusedValue.map({ $0 as! AXUIElement })
-        else { return windowFallback(appElement) }
+        let focused: AXUIElement? = AXUIElementCopyAttributeValue(
+            appElement, kAXFocusedUIElementAttribute as CFString, &focusedValue) == .success
+            ? focusedValue.map({ $0 as! AXUIElement }) : nil
 
         if let bundleID = app.bundleIdentifier, SupportedTerminal.isElectron(bundleID: bundleID) {
-            /* xterm.js: bounds-for-range on the hidden textarea just echoes
-               its frame, which sits off the row grid — use the grid instead. */
-            return xtermCaret(focused) ?? windowFallback(appElement)
+            /* xterm.js keeps a caret-sized hidden textarea at the cursor, and
+               it is the focused element while typing (bounds-for-range on it
+               just echoes its frame, off the row grid — xtermCaret snaps).
+               Chromium does not always report it, though: right after the
+               window activates, or while its tree is still being built,
+               focus can read as a page-wide wrapper. The textarea found last
+               time for this shell is therefore kept and asked directly —
+               xterm keeps the same element for the life of the terminal. And
+               when neither answers, nothing: a popup pinned to the window's
+               corner is worse than one that arrives a keystroke later. */
+            if let focused, let placement = xtermCaret(focused) {
+                xtermCarets[session.sid] = focused
+                return placement
+            }
+            if let cached = xtermCarets[session.sid], let placement = xtermCaret(cached) {
+                return placement
+            }
+            debugLine("\(session.tty.split(separator: "/").last.map(String.init) ?? "?") "
+                      + "xterm caret missing: focused=\(describe(focused)) cached=\(xtermCarets[session.sid] != nil)")
+            return nil
         }
+        guard let focused else { return windowFallback(appElement) }
 
         // The caret is the (empty) selected range's location.
         var rangeValue: CFTypeRef?
@@ -96,6 +113,17 @@ enum CaretLocator {
        ratio — either could be wrong at another font size or zoom — snap to
        the row grid: the nearest ancestor whose height is a whole number of
        cells is the terminal's grid container, and rows start at its top. */
+    /// The xterm caret textarea last seen focused, per shell session.
+    private static var xtermCarets: [String: AXUIElement] = [:]
+
+    private static func describe(_ element: AXUIElement?) -> String {
+        guard let element else { return "none" }
+        var roleValue: CFTypeRef?
+        AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &roleValue)
+        let rect = frame(of: element).map { "\(Int($0.minX)),\(Int($0.minY)) \(Int($0.width))x\(Int($0.height))" } ?? "?"
+        return "\(roleValue as? String ?? "?") \(rect)"
+    }
+
     private static func xtermCaret(_ element: AXUIElement) -> Placement? {
         guard let caret = frame(of: element),
               caret.height > 2, caret.height < 60, caret.width < 120
@@ -213,6 +241,10 @@ enum CaretLocator {
         handle?.seekToEndOfFile()
         return handle
     }()
+
+    private static func debugLine(_ text: String) {
+        placementLog?.write(Data((text + "\n").utf8))
+    }
 
     private static func debugLog(session: Session, panes: [(element: AXUIElement, frame: CGRect)],
                                  chosen: CGRect, textSize: CGSize, cell: CGSize, pad: CGFloat,

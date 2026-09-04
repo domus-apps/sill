@@ -430,3 +430,17 @@ private struct FixedOverlays: OverlayProviding {
     #expect(merged.map(\.display) == ["../", "sibling/"])
     #expect(TemplateResolver.withParentEntry(merged, partial: Token(text: "../", typedLength: 3)).count == 2)
 }
+
+// MARK: - Arrow keys at the ends of the list
+
+@Test func heldArrowStopsAtTheEndWhileATapWrapsRound() {
+    // No earlier press in that direction: a tap.
+    #expect(CompletionController.arrowWraps(sinceLast: nil, repeatInterval: 0.083))
+    // A repeat arrives at the key-repeat interval (or a little late).
+    #expect(!CompletionController.arrowWraps(sinceLast: 0.083, repeatInterval: 0.083))
+    #expect(!CompletionController.arrowWraps(sinceLast: 0.12, repeatInterval: 0.083))
+    // Deliberate taps come well apart.
+    #expect(CompletionController.arrowWraps(sinceLast: 0.3, repeatInterval: 0.083))
+    // With the fastest repeat setting, even quick tapping still wraps.
+    #expect(CompletionController.arrowWraps(sinceLast: 0.12, repeatInterval: 0.033))
+}

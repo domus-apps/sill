@@ -186,10 +186,14 @@ final class PopupPanel {
         userNavigated = false
     }
 
-    func moveSelection(by delta: Int) {
+    /// `wrapping` false stops at either end instead of cycling round.
+    func moveSelection(by delta: Int, wrapping: Bool = true) {
         guard !model.suggestions.isEmpty else { return }
         let count = model.suggestions.count
-        model.selectedIndex = (model.selectedIndex + delta + count) % count
+        let target = model.selectedIndex + delta
+        model.selectedIndex = wrapping
+            ? (target + count) % count
+            : max(0, min(count - 1, target))
         userNavigated = true
     }
 }
@@ -259,11 +263,25 @@ private struct PopupRow: View {
     var suggestion: Suggestion
     var isSelected: Bool
 
+    /* Text on the accent-coloured selection. White reads on every accent
+       but yellow, where it all but vanishes; the system draws its own
+       selections in dark text there. Decide from the accent's brightness
+       rather than its name: yellow lands well above green and orange, which
+       stay white like the system's. Resolved per row, so a change in
+       System Settings shows on the next list. */
+    private static var selectionTextIsDark: Bool {
+        guard let accent = NSColor.controlAccentColor.usingColorSpace(.sRGB) else { return false }
+        let luminance = 0.2126 * accent.redComponent + 0.7152 * accent.greenComponent
+            + 0.0722 * accent.blueComponent
+        return luminance > 0.7
+    }
+    private var onAccent: Color { Self.selectionTextIsDark ? .black : .white }
+
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: symbolName)
                 .font(.system(size: 11))
-                .foregroundStyle(isSelected ? .white : .secondary)
+                .foregroundStyle(isSelected ? AnyShapeStyle(onAccent) : AnyShapeStyle(.secondary))
                 .frame(width: 14)
             highlightedDisplay
                 .font(.system(size: 12, design: .monospaced))
@@ -272,7 +290,7 @@ private struct PopupRow: View {
                 Text(suggestion.aliases.joined(separator: " "))
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundStyle(isSelected
-                        ? AnyShapeStyle(.white.opacity(0.6)) : AnyShapeStyle(.tertiary))
+                        ? AnyShapeStyle(onAccent.opacity(0.6)) : AnyShapeStyle(.tertiary))
                     .lineLimit(1)
             }
             Spacer(minLength: 8)
@@ -280,7 +298,7 @@ private struct PopupRow: View {
                 Text(suggestion.detail)
                     .font(.system(size: 11))
                     .foregroundStyle(isSelected
-                        ? AnyShapeStyle(.white.opacity(0.75)) : AnyShapeStyle(.tertiary))
+                        ? AnyShapeStyle(onAccent.opacity(0.75)) : AnyShapeStyle(.tertiary))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
@@ -301,9 +319,9 @@ private struct PopupRow: View {
     /// partial) the whole name stays at full strength.
     private var highlightedDisplay: Text {
         let matched = Set(suggestion.matchedOffsets)
-        let strong: AnyShapeStyle = isSelected ? AnyShapeStyle(.white) : AnyShapeStyle(.primary)
+        let strong: AnyShapeStyle = isSelected ? AnyShapeStyle(onAccent) : AnyShapeStyle(.primary)
         let faint: AnyShapeStyle = matched.isEmpty ? strong
-            : isSelected ? AnyShapeStyle(.white.opacity(0.7)) : AnyShapeStyle(.secondary)
+            : isSelected ? AnyShapeStyle(onAccent.opacity(0.7)) : AnyShapeStyle(.secondary)
         var pieces = Text("")
         var run = ""
         var runMatched = false

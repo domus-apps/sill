@@ -4,6 +4,13 @@ All notable changes to Sill are documented here. The release workflow publishes 
 
 Keep each bullet on a single line: release notes render line breaks literally (both on GitHub and in the update dialog), so wrapped lines would break mid-sentence.
 
+## 1.6.0
+
+- In VS Code the popup opens at the current cell and holds still while you type.
+- Text in the highlighted row turns dark on light accent colors such as yellow.
+- Holding an arrow key stops at the end of the list, and a single press at the end wraps round.
+- Terminal tabs opened after this update reconnect on the next keystroke when Sill is quit and relaunched, or updated.
+
 ## 1.5.0
 
 - A small "Loading…" row sits at the bottom of the popup while a list is still on its way, as with `npm install re`.
