@@ -153,5 +153,31 @@
         sparkle:edSignature="FNKjcH5mDWZhV4k17UtOZHNjsAMRhOqI0uqTFi06u7Hluw7Rx3/SsV0oU5fTrfkKuQUYOKFD9OGkJr71IcQ/BQ==" length="3202375"
         type="application/octet-stream"/>
     </item>
+    <item>
+      <title>Sill v1.5.0</title>
+      <link>https://github.com/domus-apps/sill/releases/tag/v1.5.0</link>
+      <pubDate>Fri, 04 Sep 2026 02:01:42 +0000</pubDate>
+      <description xml:lang="en"><![CDATA[
+<ul>
+<li>A small "Loading…" row sits at the bottom of the popup while a list is still on its way, as with <code class="notranslate">npm install re</code>.</li>
+<li>Typing <code class="notranslate">..</code> offers <code class="notranslate">../</code> like any other folder, and with <code class="notranslate">cd ../</code> it stays on top so Return goes up one level.</li>
+<li>Newer gh commands are completed, such as <code class="notranslate">gh auth switch</code> and <code class="notranslate">gh auth token</code>.</li>
+<li>With "Learn unknown commands from --help" on, a command that already has a definition also gains what that definition lacks.</li>
+</ul>      ]]></description>
+      <description xml:lang="ko"><![CDATA[
+<ul>
+<li>목록을 아직 가져오는 중이면 팝업 아래에 작은 "불러오는 중…" 행이 보입니다. <code class="notranslate">npm install re</code>가 그런 경우입니다.</li>
+<li><code class="notranslate">..</code>을 입력하면 <code class="notranslate">../</code>가 다른 폴더처럼 목록에 오르고, <code class="notranslate">cd ../</code>에서는 맨 위에 남아 Return으로 한 단계 위로 이동할 수 있습니다.</li>
+<li><code class="notranslate">gh auth switch</code>, <code class="notranslate">gh auth token</code> 같은 새로운 gh 명령이 완성됩니다.</li>
+<li>"모르는 명령은 --help로 익히기"를 켜면 정의가 있는 명령도 그 정의에 빠진 부분을 채웁니다.</li>
+</ul>      ]]></description>
+      <sparkle:version>6</sparkle:version>
+      <sparkle:shortVersionString>1.5.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <enclosure
+        url="https://github.com/domus-apps/sill/releases/download/v1.5.0/Sill.zip"
+        sparkle:edSignature="q2A82w1pzntF5PwYXcVKprngl7q5eJ+/29C5KcHvQcp3u6vzuV9AxbeJrKBQuZj8KvsgOCbrJBnAsiYqutaqBw==" length="3218289"
+        type="application/octet-stream"/>
+    </item>
   </channel>
 </rss>
