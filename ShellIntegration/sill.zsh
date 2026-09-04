@@ -46,6 +46,7 @@ autoload -Uz add-zle-hook-widget add-zsh-hook
 typeset -g _sill_fd=-1
 typeset -g _sill_sid="$$-${RANDOM}${RANDOM}"
 typeset -g _sill_dead=0        # connect failed this prompt; retry next precmd
+typeset -gi _sill_retry_at=0   # $SECONDS after which a keystroke may retry
 typeset -g _sill_last=""       # last sent buffer+cursor, for dedup
 typeset -g _sill_popup=0       # the app's popup is on screen
 typeset -g _sill_nav=0         # user has arrow-navigated (gates Return)
@@ -276,7 +277,21 @@ _sill_send() {
 }
 
 _sill_send_buf() {
-    (( _sill_fd >= 0 )) || return 0
+    if (( _sill_fd < 0 )); then
+        # Not connected — the app was quit, or updated and relaunched, since
+        # this prompt appeared. Rather than wait for the next prompt, try
+        # again from the keystroke itself, at most once every two seconds:
+        # a connect to a socket nobody listens on fails at once and costs
+        # nothing, and the first keystroke after the app is back gets its
+        # completions without an Enter in every open shell.
+        (( SECONDS >= _sill_retry_at )) || return 0
+        _sill_retry_at=$(( SECONDS + 2 ))
+        _sill_dead=0
+        _sill_connect || return 0
+        zle -F $_sill_fd _sill_reply_handler
+        _sill_registered=1
+        _sill_last=""
+    fi
     # The terminal was resized (a pane split, a window drag). The pane's new
     # size follows from the grid, and the cell size still holds — the font
     # didn't change. The anchor is the doubtful part: a reflow can move the
