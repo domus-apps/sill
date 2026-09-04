@@ -117,6 +117,8 @@ with open(os.path.join(out, "index.json"), "w") as fh:
 print(f"{len(files)} specs, {len(descriptions)} with descriptions")
 PY
 
+# The corpus is redistributed here, so its license travels with it.
+cp "$WORK/package/LICENSE" "$OUT/LICENSE.withfig"
 (cd build && zip -qr specs.zip specs)
 SHA=$(shasum -a 256 build/specs.zip | cut -d' ' -f1)
 printf '{"version":"%s","sha256":"%s"}\n' "$ACTUAL" "$SHA" > build/specs-manifest.json

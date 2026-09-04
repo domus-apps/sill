@@ -60,3 +60,9 @@ the popup.
 ```
 
 Requires macOS 26 or later.
+
+## License
+
+MIT, see [LICENSE](LICENSE). Bundled third-party software and its licenses are listed in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+
+Completion definitions come from Fig's open-source [withfig/autocomplete](https://github.com/withfig/autocomplete) corpus; see the notices for its license.
