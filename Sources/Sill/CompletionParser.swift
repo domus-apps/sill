@@ -350,8 +350,10 @@ struct CompletionParser {
         if partial.isEmpty { return longest(names) }
         // Within the best-matching tier, prefer the canonical (longest)
         // alias: "bun i" should read "install", not "i".
+        // The whole-word tier folds into the prefix tier here: "bun i" should
+        // still read "install", not "i".
         let matched = names.compactMap { name in
-            FuzzyMatcher.match(partial, in: name).map { (name: name, tier: $0.tier) }
+            FuzzyMatcher.match(partial, in: name).map { (name: name, tier: min($0.tier, 4)) }
         }
         guard let bestTier = matched.map(\.tier).max() else { return nil }
         return longest(matched.filter { $0.tier == bestTier }.map(\.name))
@@ -371,6 +373,14 @@ struct CompletionParser {
             var s = suggestion
             s.score = match.rank
             s.matchedOffsets = match.offsets
+            /* Typing an alias in full — "npm i" for install — is as strong a
+               signal as typing the word itself: someone who knows the short
+               form means that item, so it outranks "info" and "init", which
+               merely start with the letter. The row still reads "install"
+               and Return still inserts it. */
+            if !partial.isEmpty, suggestion.aliases.contains(partial) {
+                s.score = max(s.score, FuzzyMatcher.Match(tier: 5, score: 0, offsets: []).rank)
+            }
             return s
         }
         let recent: (Suggestion) -> Double = { [recency] s in

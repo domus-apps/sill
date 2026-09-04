@@ -39,8 +39,11 @@ enum TemplateResolver {
             if foldersOnly && !isDirectory { return nil }
             let escaped = shellEscaped(directoryPrefix + name)
             return Suggestion(
+                // The slash is shown, not typed: an insertion ends where the
+                // word ends, and a trailing "/" would change what rsync and
+                // cp -R do. The next "/" the user types lists the folder.
                 display: name + (isDirectory ? "/" : ""),
-                insertText: escaped + (isDirectory ? "/" : ""),
+                insertText: escaped,
                 deleteCount: partial.typedLength,
                 detail: "",
                 kind: isDirectory ? .folder : .file,
@@ -189,10 +192,23 @@ final class GeneratorRunner {
             .map { makeSuggestion($0, detail: "", insertValue: nil, partial: partial) }
     }
 
+    /// What choosing `name` types: the name, shell-escaped, without a
+    /// trailing "/" — generators that list directories (fig's filepaths,
+    /// `ls -p`) mark them that way, and the mark is for the eye.
+    static func insertion(for name: String) -> String {
+        TemplateResolver.shellEscaped(withoutTrailingSlash(name))
+    }
+
+    /// For an insertValue a spec wrote itself: already in the shape it
+    /// should be typed, so only the folder slash comes off.
+    static func withoutTrailingSlash(_ text: String) -> String {
+        text.hasSuffix("/") ? String(text.dropLast()) : text
+    }
+
     private func makeSuggestion(_ name: String, detail: String, insertValue: String?,
                                 partial: Token) -> Suggestion {
-        let insert = insertValue.map(CompletionParser.stripCursorMark)
-            ?? TemplateResolver.shellEscaped(name)
+        let insert = insertValue.map { Self.withoutTrailingSlash(CompletionParser.stripCursorMark($0)) }
+            ?? Self.insertion(for: name)
         return Suggestion(display: name, insertText: insert,
                           deleteCount: partial.typedLength, detail: detail, kind: .argument)
     }
@@ -271,8 +287,9 @@ final class GeneratorRunner {
     }
 
     /// Suggestions from a custom generator: {name|displayName, description,
-    /// insertValue, type}. Folders keep their trailing "/" and take no space
-    /// so the user can keep descending; everything else gets the usual space.
+    /// insertValue, type}. A folder's trailing "/" stays in the display and
+    /// leaves the insertion, like every other list: the user types the "/"
+    /// that descends.
     private func customSuggestions(from value: JSValue, deleteCount: Int) -> [Suggestion] {
         guard value.isArray else { return [] }
         var suggestions: [Suggestion] = []
@@ -281,7 +298,7 @@ final class GeneratorRunner {
             if element.isString {
                 let name = element.toString() ?? ""
                 suggestions.append(Suggestion(
-                    display: name, insertText: TemplateResolver.shellEscaped(name),
+                    display: name, insertText: Self.insertion(for: name),
                     deleteCount: deleteCount, detail: "", kind: .argument))
                 continue
             }
@@ -292,8 +309,10 @@ final class GeneratorRunner {
             let type = element.objectForKeyedSubscript("type")?.toString() ?? ""
             let isFolder = type == "folder" || name.hasSuffix("/")
             let kind: Suggestion.Kind = isFolder ? .folder : (type == "file" ? .file : .argument)
-            let insert = node.insertValue.map(CompletionParser.stripCursorMark)
-                ?? TemplateResolver.shellEscaped(name) + (isFolder ? "" : " ")
+            // A folder's own insertValue (fig's filepaths generator hands
+            // "src/") loses its slash the same way.
+            let insert = node.insertValue.map { Self.withoutTrailingSlash(CompletionParser.stripCursorMark($0)) }
+                ?? Self.insertion(for: name)
             suggestions.append(Suggestion(
                 display: name, insertText: insert, deleteCount: deleteCount,
                 detail: node.specDescription, kind: kind, priority: node.priority))

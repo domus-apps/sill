@@ -33,7 +33,7 @@ if let index = CommandLine.arguments.firstIndex(of: "--complete"),
             runner.run(arg: pending.node, tokens: result.commandTokens,
                                   partial: pending.partial, cwd: cwd, sid: "cli") { generated in
                 for s in generated.prefix(12) {
-                    print("\(s.display)\t\(s.kind)\tgenerator\t\(s.detail.prefix(40))")
+                    print("\(s.display)\t\(s.kind)\tgenerator\tinsert=\"\(s.insertText)\"\t\(s.detail.prefix(40))")
                 }
                 finished = true
             }

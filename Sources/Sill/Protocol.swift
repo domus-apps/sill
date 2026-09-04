@@ -93,9 +93,13 @@ struct GridInfo: Equatable {
 struct PopupStateCommand {
     var visible: Bool
     var navigated: Bool
+    /// The highlighted item is exactly what has been typed: inserting it
+    /// would change nothing, so Return should run the line instead. The
+    /// plugin decides that on the keypress, synchronously.
+    var exact: Bool = false
 
     func encoded() -> Data {
-        Data(#"{"t":"popup","visible":\#(visible),"nav":\#(navigated)}"#.utf8 + [0x0A])
+        Data(#"{"t":"popup","visible":\#(visible),"nav":\#(navigated),"exact":\#(exact)}"#.utf8 + [0x0A])
     }
 }
 

@@ -22,7 +22,8 @@
 #   → {"t":"key","sid":…,"key":…}                (steering key while popup up)
 #   → {"t":"end","sid":…}                       (line accepted/aborted — hide)
 #   ← {"t":"insert","del":N,"text":…}            (replace the partial token)
-#   ← {"t":"popup","visible":…,"nav":…}          (bind/unbind steering keys)
+#   ← {"t":"popup","visible":…,"nav":…,"exact":…} (bind/unbind steering keys;
+#     "exact": the highlighted item is exactly what was typed, so Return runs)
 #
 # Steering keys (Tab, arrows, Return, Esc) are consumed HERE, as ZLE
 # widgets bound only while the popup is visible: the shell receives keys
@@ -48,6 +49,7 @@ typeset -g _sill_dead=0        # connect failed this prompt; retry next precmd
 typeset -g _sill_last=""       # last sent buffer+cursor, for dedup
 typeset -g _sill_popup=0       # the app's popup is on screen
 typeset -g _sill_nav=0         # user has arrow-navigated (gates Return)
+typeset -g _sill_exact=0       # highlighted item == what was typed (Return runs)
 typeset -g _sill_bound=0
 typeset -gA _sill_saved_bindings
 typeset -g _sill_saved_keytimeout=""
@@ -318,6 +320,7 @@ _sill_reply_handler() {
     if [[ "$line" == *'"t":"popup"'* ]]; then
         [[ "$line" == *'"visible":true'* ]] && _sill_popup=1 || _sill_popup=0
         [[ "$line" == *'"nav":true'* ]] && _sill_nav=1 || _sill_nav=0
+        [[ "$line" == *'"exact":true'* ]] && _sill_exact=1 || _sill_exact=0
         if (( _sill_popup )); then _sill_bind_keys; else _sill_unbind_keys; fi
         return 0
     fi
@@ -497,6 +500,14 @@ _sill_key_up()   { (( _sill_popup )) && _sill_send_key up   || _sill_fallback }
 _sill_key_down() { (( _sill_popup )) && _sill_send_key down || _sill_fallback }
 _sill_key_esc()  { (( _sill_popup )) && _sill_send_key esc  || _sill_fallback }
 _sill_key_ret() {
+    if (( _sill_popup && _sill_exact )); then
+        # The highlighted item is exactly what was typed: nothing to insert,
+        # so Return does what Return does — decided here, synchronously.
+        _sill_popup=0
+        _sill_unbind_keys
+        zle .accept-line
+        return 0
+    fi
     if (( _sill_popup )); then
         _sill_send_key ret
         return 0

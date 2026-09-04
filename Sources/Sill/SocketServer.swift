@@ -82,6 +82,7 @@ final class SocketServer {
         send(command.encoded(), to: client)
     }
 
+
     private func send(_ data: Data, to client: ClientID) {
         guard clients[client] != nil else { return }
         let written = data.withUnsafeBytes { write(client, $0.baseAddress, $0.count) }

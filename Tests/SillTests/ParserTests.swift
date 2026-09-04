@@ -296,3 +296,54 @@ private struct FixedCatalog: CommandCatalogProviding {
     #expect(catalog.commands(matching: "s", searchPath: "/bin").isEmpty)   // aws/s3 is not a command
     #expect(CommandCatalog.scan("/bin").contains("ls"))
 }
+
+// MARK: - Files and folders from the template resolver
+
+@Test func folderCompletionShowsButDoesNotTypeTheSlash() throws {
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("sill-template-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: root.appendingPathComponent("src"),
+                                            withIntermediateDirectories: true)
+    try Data().write(to: root.appendingPathComponent("setup.sh"))
+    defer { try? FileManager.default.removeItem(at: root) }
+
+    let partial = Token(text: "s", typedLength: 1)
+    let all = TemplateResolver.suggestions(templates: ["filepaths"], partial: partial, cwd: root.path)
+    let folder = try #require(all.first { $0.kind == .folder })
+    #expect(folder.display == "src/")        // the slash marks it as a folder…
+    #expect(folder.insertText == "src")      // …but is left for the user to type
+    let file = try #require(all.first { $0.kind == .file })
+    #expect(file.display == "setup.sh")
+    #expect(file.insertText == "setup.sh")   // and no trailing space either
+
+    // A path prefix is kept in the insertion, still without the slash.
+    let nested = TemplateResolver.suggestions(
+        templates: ["folders"], partial: Token(text: "./s", typedLength: 3), cwd: root.path)
+    #expect(nested.map(\.insertText) == ["./src"])
+}
+
+@Test func generatorFolderNamesLoseTheirSlashOnInsertion() {
+    #expect(GeneratorRunner.insertion(for: "Sources/") == "Sources")
+    #expect(GeneratorRunner.insertion(for: "main") == "main")
+    #expect(GeneratorRunner.insertion(for: "My Dir/") == "My\\ Dir")
+}
+
+@Test func anExactAliasOutranksPlainPrefixMatches() {
+    // "i" is an alias of install and merely a prefix of info and init. (The
+    // test engine answers to "git" only, so the spec is mounted under git.)
+    let engine = SpecEngine()
+    let spec = """
+    var __sillSpec = { default: { name: "git", subcommands: [
+      { name: "info", description: "Show package info" },
+      { name: "init", description: "Create a package.json" },
+      { name: ["install", "i", "add"], description: "Install a package" }
+    ] } };
+    """
+    let node = engine.evaluate(spec)!
+    let parser = CompletionParser(engine: SpyEngine(engine: engine, root: node))
+    let result = parser.complete(buffer: "git i", cursor: 5)
+    #expect(result.suggestions.map(\.display) == ["install", "info", "init"])
+    #expect(result.suggestions.first?.insertText == "install")
+    // Typing more than the alias goes back to ordinary ranking.
+    #expect(parser.complete(buffer: "git in", cursor: 6).suggestions.map(\.display) == ["info", "init", "install"])
+}

@@ -216,8 +216,12 @@ final class CompletionController {
     /// to decide that synchronously on the keypress.
     private func sendPopupState() {
         guard let client = popupClient else { return }
+        let exact = popup.isVisible && sessions[client].map { session in
+            popup.selectedSuggestion?.insertsNothing(
+                before: String(session.buffer.prefix(session.cursor))) ?? false
+        } ?? false
         server.send(
-            PopupStateCommand(visible: popup.isVisible, navigated: popup.userNavigated),
+            PopupStateCommand(visible: popup.isVisible, navigated: popup.userNavigated, exact: exact),
             to: client)
     }
 
@@ -239,8 +243,10 @@ final class CompletionController {
                 acceptInto(session, suggestion)
             }
         case "ret":
-            // Return inserts the highlighted item whenever the popup is up —
-            // one predictable rule (Esc first if the command should run).
+            /* Return inserts the highlighted item. (When that item is exactly
+               what has been typed — "ls" with ls and lsof listed — the plugin
+               runs the line itself, from the `exact` flag in the popup
+               state, and this key never arrives.) */
             if let suggestion = popup.selectedSuggestion {
                 acceptInto(session, suggestion)
             }
@@ -259,18 +265,15 @@ final class CompletionController {
 
     private func acceptInto(_ session: Session, _ suggestion: Suggestion) {
         recency.record(command: presentedCommand, display: suggestion.display)
-        /* Insertions carry no trailing space, so the buffer the shell reports
-           back still ends in the completed word — which would match itself
-           and re-open the popup on the very item just chosen. Stay down
-           until the buffer changes again (a space, `/`, more typing);
-           a folder insertion ends in "/" and should keep listing, so it is
-           exempt. */
-        if !suggestion.insertText.hasSuffix("/") {
-            let prefix = String(session.buffer.prefix(session.cursor))
-            let suffix = String(session.buffer.dropFirst(session.cursor))
-            suppressedBuffer = String(prefix.dropLast(suggestion.deleteCount))
-                + suggestion.insertText + suffix
-        }
+        /* Insertions carry no trailing space or slash, so the buffer the
+           shell reports back still ends in the completed word — which would
+           match itself and re-open the popup on the very item just chosen.
+           Stay down until the buffer changes again (a space, a "/", more
+           typing). */
+        let prefix = String(session.buffer.prefix(session.cursor))
+        let suffix = String(session.buffer.dropFirst(session.cursor))
+        suppressedBuffer = String(prefix.dropLast(suggestion.deleteCount))
+            + suggestion.insertText + suffix
         server.send(InsertCommand(del: suggestion.deleteCount, text: suggestion.insertText),
                     to: session.client)
         // The choice is made: down now, not when the shell echoes the buffer

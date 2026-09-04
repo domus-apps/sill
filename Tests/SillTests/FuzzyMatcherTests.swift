@@ -121,3 +121,22 @@ import Testing
     #expect(CaretLocator.wrappedRowsForTesting(String(repeating: "x", count: 28), cols: 28) == 1)
     #expect(CaretLocator.wrappedRowsForTesting(String(repeating: "x", count: 29), cols: 28) == 2)
 }
+
+@Test func theWholeWordOutranksEverythingIncludingRecency() {
+    #expect(FuzzyMatcher.match("ls", in: "ls")?.tier == 5)
+    #expect(FuzzyMatcher.match("ls", in: "lsof")?.tier == 4)
+    // In a list, the exact word comes first even when the other was picked recently.
+    let recency = RecencyStore(defaults: nil)
+    recency.record(command: "", display: "lsof")
+    var parser = makeParser()
+    parser.recency = recency
+    parser.commands = FixedCatalogForFuzzy(entries: [("lsof", "List open files"), ("ls", "List directory contents")])
+    #expect(parser.complete(buffer: "ls", cursor: 2).suggestions.map(\.display) == ["ls", "lsof"])
+}
+
+private struct FixedCatalogForFuzzy: CommandCatalogProviding {
+    var entries: [(name: String, description: String)]
+    func commands(matching prefix: String, searchPath: String) -> [(name: String, description: String)] {
+        entries.filter { $0.name.hasPrefix(prefix) }
+    }
+}

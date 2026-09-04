@@ -2,9 +2,10 @@ import Foundation
 
 /* How a typed partial is matched against a candidate, in one place for
    every list (subcommands, options, command names, generator output,
-   files). Four tiers, best first — the first three are what Sill always
-   did, the fourth is fuzzy:
+   files). Five tiers, best first — an exact match, then the three Sill
+   always had, then fuzzy:
 
+     5  the whole word             "ls"   → "ls" (ahead of "lsof", whatever was used last)
      4  exact-case prefix          "che"  → "checkout"
      3  case-insensitive prefix    "Che"  → "checkout"
      2  substring                  "eck"  → "checkout"
@@ -16,7 +17,7 @@ import Foundation
    character comparisons per keystroke — well under the sort that follows. */
 enum FuzzyMatcher {
     struct Match: Equatable {
-        /// 4…1 as above; higher is better.
+        /// 5…1 as above; higher is better.
         var tier: Int
         /// Orders candidates inside the fuzzy tier; 0 elsewhere.
         var score: Int
@@ -33,6 +34,9 @@ enum FuzzyMatcher {
         let candidateChars = Array(candidate)
         guard queryChars.count <= candidateChars.count else { return nil }
 
+        if candidate == query {
+            return Match(tier: 5, score: 0, offsets: Array(0..<queryChars.count))
+        }
         if candidate.hasPrefix(query) {
             return Match(tier: 4, score: 0, offsets: Array(0..<queryChars.count))
         }

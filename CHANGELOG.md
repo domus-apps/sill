@@ -4,6 +4,13 @@ All notable changes to Sill are documented here. The release workflow publishes 
 
 Keep each bullet on a single line: release notes render line breaks literally (both on GitHub and in the update dialog), so wrapped lines would break mid-sentence.
 
+## 1.4.0
+
+- Completing a folder no longer adds a trailing slash; typing one lists what is inside.
+- If the highlighted item is exactly what you typed, Return runs the command. `ls` runs even with `lsof` in the list.
+- Typing an alias puts its command first: `npm i` lists install above info and init.
+- Fixed a stray space after some completions.
+
 ## 1.3.0
 
 - Splitting a pane or resizing the window no longer throws the popup off: it finds the caret again on the very next keystroke, with no Enter needed.
