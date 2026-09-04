@@ -32,6 +32,9 @@ final class CompletionController {
     private var placementWatchdog: Timer?
     /// Drops generator replies that arrive after the buffer moved on.
     private var generation = 0
+    /// Puts the loading row up once a generator has run for 150ms — long
+    /// enough that a spinner informs rather than flickers.
+    private var loadingTimer: DispatchWorkItem?
 
     init(sessions: SessionRegistry, server: SocketServer, specDirectories: [URL],
          derived: DerivedSpecStore) {
@@ -40,7 +43,7 @@ final class CompletionController {
         self.derived = derived
         engine = SpecEngine(specDirectories: specDirectories, derived: derived)
         commandCatalog = CommandCatalog(specDirectories: specDirectories, derived: derived)
-        parser = CompletionParser(engine: engine, recency: recency)
+        parser = CompletionParser(engine: engine, recency: recency, overlays: derived)
 
         // A spec learned from --help just landed: the list for the buffer
         // on screen may be different now.
@@ -110,11 +113,18 @@ final class CompletionController {
             if let path = result.unexploredPath {
                 derived.explore(path: path, searchPath: session.searchPath)
             }
+            if !result.path.isEmpty {
+                // A command with a spec: read --help at this level once, for
+                // whatever the spec is missing here.
+                derived.augment(path: result.path, searchPath: session.searchPath)
+            }
         }
         let command = result.commandTokens.first ?? ""
         presentedCommand = command
         var suggestions = result.suggestions
         var awaitingGenerators = false
+        loadingTimer?.cancel()
+        loadingTimer = nil
 
         if let pending = result.pendingArg {
             suggestions += TemplateResolver.suggestions(
@@ -129,10 +139,31 @@ final class CompletionController {
                     // Already filtered by the runner (query-term aware). An
                     // empty result with nothing static to show is the moment
                     // to hide — not before, while the shell command runs.
-                    let ordered = self.recency.sorted(generated, command: command)
+                    self.loadingTimer?.cancel()
+                    self.loadingTimer = nil
+                    var ordered = self.recency.sorted(generated, command: command)
+                    if ordered.contains(where: { $0.kind == .folder || $0.kind == .file }) {
+                        // A generator that lists paths (cd's, for one) gets
+                        // the same "../" entry as the native templates.
+                        ordered = TemplateResolver.withParentEntry(ordered, partial: pending.partial)
+                    }
                     self.present(suggestions + ordered, for: session)
                 }
             }
+        }
+        if awaitingGenerators {
+            let timer = DispatchWorkItem { [weak self] in
+                guard let self, self.generation == currentGeneration else { return }
+                if self.popup.isVisible {
+                    self.popup.setLoading(true)
+                } else {
+                    self.present(suggestions, for: session, loading: true)
+                }
+            }
+            loadingTimer = timer
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: timer)
+        } else {
+            popup.setLoading(false)
         }
         if suggestions.isEmpty, awaitingGenerators, popup.isVisible {
             // Keep the previous list on screen until the generator answers;
@@ -147,17 +178,17 @@ final class CompletionController {
 
     private func currentSuggestions() -> [Suggestion] { presented }
 
-    private func present(_ suggestions: [Suggestion], for session: Session) {
+    private func present(_ suggestions: [Suggestion], for session: Session, loading: Bool = false) {
         /* The word is finished: one suggestion left and it is exactly what
            has been typed. There is nothing to complete, so stay out of the
            way — Return runs the command and Tab goes to the shell, instead
            of both being held for a completion that would change nothing. */
-        if suggestions.count == 1,
+        if !loading, suggestions.count == 1,
            suggestions[0].insertsNothing(before: String(session.buffer.prefix(session.cursor))) {
             hide()
             return
         }
-        guard !suggestions.isEmpty, sessions.activeSession === session,
+        guard !suggestions.isEmpty || loading, sessions.activeSession === session,
               let placement = CaretLocator.locate(for: session)
         else {
             hide()
@@ -170,7 +201,7 @@ final class CompletionController {
                   NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "?")
         }
         popup.setPrefersDark(session.prefersDark)
-        popup.show(suggestions, at: placement)
+        popup.show(suggestions, at: placement, loading: loading)
         popupClient = session.client
         shownPlacement = placement
         startPlacementWatchdog()
@@ -178,6 +209,8 @@ final class CompletionController {
     }
 
     private func hide() {
+        loadingTimer?.cancel()
+        loadingTimer = nil
         presented = []
         placementWatchdog?.invalidate()
         placementWatchdog = nil

@@ -24,6 +24,9 @@
 "Continue" = "계속";
 "Done" = "완료";
 
+/* 팝업 */
+"Loading…" = "불러오는 중…";
+
 /* 설정 — 사이드바 */
 "General" = "일반";
 
@@ -45,7 +48,7 @@
 "Checked %@" = "%@ 확인함";
 "Definitions for hundreds of CLIs, from the open-source withfig/autocomplete project. Refreshed daily in the background." = "오픈 소스 withfig/autocomplete 프로젝트에서 가져온 수백 개 CLI의 정의입니다. 매일 백그라운드에서 갱신됩니다.";
 "Learn unknown commands from --help" = "모르는 명령은 --help로 익히기";
-"When a command has no spec, Sill runs it once with --help in the background and keeps what it learns on this Mac. Real programs only — shell scripts are never run." = "정의가 없는 명령은 백그라운드에서 --help로 한 번 실행해 익힌 내용을 이 Mac에 보관합니다. 실제 프로그램만 실행하며 셸 스크립트는 절대 실행하지 않습니다.";
+"Runs a command once with --help in the background to learn what its definition lacks, or all of it when there is none, and keeps that on this Mac. Real programs only — shell scripts are never run." = "명령을 백그라운드에서 --help로 한 번 실행해 정의에 빠진 부분을, 정의가 없으면 전체를 익혀 이 Mac에 보관합니다. 실제 프로그램만 실행하며 셸 스크립트는 절대 실행하지 않습니다.";
 "Nothing learned yet" = "아직 익힌 명령 없음";
 "1 command learned" = "명령 1개 익힘";
 "%d commands learned" = "명령 %d개 익힘";

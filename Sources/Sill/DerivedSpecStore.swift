@@ -7,13 +7,21 @@ import Foundation
    the same way, one level at a time, the first time the user reaches them.
    The engine reads these files exactly like corpus specs.
 
+   Commands that DO have a spec get the same treatment one level at a time,
+   as an overlay: the first time the user reaches `gh auth `, `gh auth
+   --help` is read and whatever the spec doesn't list (a subcommand added
+   since the corpus was published, an option) is kept in
+   derived/overlays/<cmd>.json under that path. The parser merges the
+   overlay into the spec's own list, so the spec's descriptions and
+   generators stay and only the gaps are filled.
+
    Running an unknown program is the one risky step, so the gate is strict:
    a bare command name (no path), resolved through the session's own PATH
    to a real Mach-O executable or an interpreter script whose interpreter
    is not a shell — a hand-written shell script may ignore its arguments and
    simply do its thing. Anything else is skipped, and remembered as skipped
    until the file changes. */
-final class DerivedSpecStore {
+final class DerivedSpecStore: OverlayProviding {
     /// Posted on the main queue after a file changed; userInfo["command"]
     /// names the root command, or is absent when everything was forgotten.
     static let updated = Notification.Name("Sill.DerivedSpecUpdated")
@@ -65,6 +73,7 @@ final class DerivedSpecStore {
         try? FileManager.default.removeItem(at: Self.directory)
         settled.removeAll()
         missing.removeAll()
+        overlayCache.removeAll()
         NotificationCenter.default.post(name: Self.updated, object: self)
     }
 
@@ -114,6 +123,126 @@ final class DerivedSpecStore {
             DispatchQueue.main.async {
                 self?.finished(key: key, command: command)
             }
+        }
+    }
+
+    // MARK: - Overlays for commands that have a spec
+
+    static var overlayDirectory: URL { directory.appendingPathComponent("overlays") }
+
+    /// Levels already read this launch, per command: "" for the root,
+    /// "auth" for `gh auth`, "auth switch" for the level below.
+    private var overlayCache: [String: [String: Any]] = [:]
+
+    /// What `--help` at `path` listed, for the parser to merge — nil when
+    /// that level hasn't been read (yet).
+    func overlay(for path: [String]) -> OverlayLevel? {
+        guard let command = path.first else { return nil }
+        let object: [String: Any]
+        if let cached = overlayCache[command] {
+            object = cached
+        } else {
+            object = Self.loadOverlay(command) ?? [:]
+            overlayCache[command] = object
+        }
+        guard let levels = object["levels"] as? [String: Any],
+              let level = levels[Self.levelKey(path)] as? [String: Any]
+        else { return nil }
+        return OverlayLevel(level)
+    }
+
+    /// Reads `<path> --help` once for a command that has a spec, so the
+    /// parser can add what the spec is missing at that level. Main thread;
+    /// the result arrives as an `updated` notification.
+    func augment(path: [String], searchPath: String) {
+        guard let command = path.first, Self.isBareName(command),
+              path.count <= Self.maxDepth
+        else { return }
+        let key = "overlay " + path.joined(separator: " ")
+        guard !inFlight.contains(key), !settled.contains(key) else { return }
+        settled.insert(key)
+        // A learned command explores itself; overlays are for corpus specs.
+        guard Self.loadObject(command) == nil,
+              let executable = Self.resolve(command, searchPath: searchPath)
+        else { return }
+        let stamp = Self.stamp(of: executable)
+        if let existing = Self.loadOverlay(command), Self.sameStamp(Self.stamp(in: existing), stamp),
+           let levels = existing["levels"] as? [String: Any], levels[Self.levelKey(path)] != nil {
+            return  // this level is on file, from this very executable
+        }
+        guard case .runnable = Self.classify(executable) else { return }
+        inFlight.insert(key)
+        queue.async { [weak self] in
+            _ = Self.augmentNow(path: path, executable: executable, stamp: stamp, searchPath: searchPath)
+            DispatchQueue.main.async {
+                self?.overlayCache.removeValue(forKey: command)
+                self?.finished(key: key, command: command)
+            }
+        }
+    }
+
+    /// Synchronous variant for the `--augment` CLI harness.
+    static func augmentNow(path: [String], searchPath: String) -> String {
+        guard let command = path.first, isBareName(command) else { return "not a bare command name" }
+        guard let executable = resolve(command, searchPath: searchPath) else {
+            return "\(command): not found in PATH"
+        }
+        if case .unsafe(let reason) = classify(executable) { return "\(command): skipped — \(reason)" }
+        return augmentNow(path: path, executable: executable, stamp: stamp(of: executable),
+                          searchPath: searchPath)
+    }
+
+    private static func augmentNow(path: [String], executable: URL, stamp: [String: Any],
+                                   searchPath: String) -> String {
+        let command = path[0]
+        let output = runHelp(executable, arguments: Array(path.dropFirst()) + ["--help"],
+                             searchPath: searchPath)
+        let spec = output.map { HelpParser.parse($0, command: command) }
+        // A changed executable starts a fresh overlay; otherwise add the level.
+        var object = loadOverlay(command) ?? [:]
+        if !sameStamp(Self.stamp(in: object), stamp) { object = [:] }
+        object["_sill"] = stamp
+        var levels = object["levels"] as? [String: Any] ?? [:]
+        let learned = spec?.figObject(name: path.last ?? command) ?? [:]
+        var level: [String: Any] = [:]
+        if let subcommands = learned["subcommands"] as? [[String: Any]] {
+            // Overlay subcommands carry no children of their own to explore.
+            level["subcommands"] = subcommands.map { entry in
+                var entry = entry
+                entry.removeValue(forKey: "_sillUnexplored")
+                return entry
+            }
+        }
+        if let options = learned["options"] { level["options"] = options }
+        levels[levelKey(path)] = level
+        object["levels"] = levels
+        writeOverlay(object, for: command)
+        let counts = "\((level["options"] as? [Any])?.count ?? 0) options, \((level["subcommands"] as? [Any])?.count ?? 0) subcommands"
+        return "\(path.joined(separator: " ")): overlay has \(counts)"
+    }
+
+    private static func levelKey(_ path: [String]) -> String {
+        path.dropFirst().joined(separator: " ")
+    }
+
+    static func overlayURL(_ command: String) -> URL {
+        overlayDirectory.appendingPathComponent(command + ".json")
+    }
+
+    static func loadOverlay(_ command: String) -> [String: Any]? {
+        guard let data = try? Data(contentsOf: overlayURL(command)) else { return nil }
+        return try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+    }
+
+    private static func writeOverlay(_ object: [String: Any], for command: String) {
+        do {
+            try FileManager.default.createDirectory(at: overlayDirectory,
+                                                    withIntermediateDirectories: true)
+            let data = try JSONSerialization.data(withJSONObject: object,
+                                                  options: [.sortedKeys, .prettyPrinted])
+            try data.write(to: overlayURL(command), options: .atomic)
+        } catch {
+            NSLog("Sill: couldn't save the overlay for %@: %@", command, error.localizedDescription)
         }
     }
 

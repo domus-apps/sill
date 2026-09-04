@@ -20,6 +20,11 @@ Two formats, one file per command, named after the command:
 
 Nested `loadSpec` files go in a subdirectory (`aws/s3.ts`), like upstream.
 
+A migrated spec keeps upstream's imports (`@fig/autocomplete-generators`,
+`@fig/autocomplete-helpers`, `semver`, `yaml`, …): `Specs/package.json` pins
+those packages and the build installs them before bundling. `Specs/tsconfig.json`
+gives editors the Fig types; nothing type-checks at build time.
+
 The bundle version becomes `<upstream>+b2.ov.<hash>` whenever this directory
 is non-empty (`b2` is the bundle format), so a change here rolls out to users
 on the next build (the spec-bundle workflow runs on push to this directory,
@@ -29,3 +34,19 @@ Check a spec locally before pushing:
 
     ./Scripts/build-specs.sh
     SILL_SPEC_DIR=build/specs swift run Sill --complete "<command> "
+
+## Where this is heading
+
+Upstream stopped publishing in May 2025. Rather than patch on top of a frozen
+corpus, a spec that needs work is migrated here whole: copy its source from
+withfig/autocomplete (MIT; keep the attribution line at the top), fix it, and
+own it from then on. Only specs that need it move; the rest keep coming from
+the upstream bundle, and the app's `--help` overlay fills gaps on each
+machine in the meantime.
+
+Once a dozen or so specs live here, they move to their own repository — a
+fork of withfig/autocomplete under domus-apps, keeping its history — with the
+spec-bundle workflow alongside them, and the app's download URL pointing
+there. That keeps this repository small (the upstream source is ~100 MB) and
+keeps the door open: if upstream resumes, a fork can still merge from it,
+and the files here are the same files a fork would hold.

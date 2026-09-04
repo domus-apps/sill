@@ -347,3 +347,86 @@ private struct FixedCatalog: CommandCatalogProviding {
     // Typing more than the alias goes back to ordinary ranking.
     #expect(parser.complete(buffer: "git in", cursor: 6).suggestions.map(\.display) == ["info", "init", "install"])
 }
+
+// MARK: - Overlays fill what a spec is missing
+
+private struct FixedOverlays: OverlayProviding {
+    var levels: [String: OverlayLevel]
+    func overlay(for path: [String]) -> OverlayLevel? { levels[path.joined(separator: " ")] }
+}
+
+@Test func overlayAddsWhatTheSpecLacksWithoutDuplicatingIt() {
+    var parser = makeParser()
+    parser.overlays = FixedOverlays(levels: [
+        "git": OverlayLevel(
+            subcommands: [.init(names: ["switch"], description: "Switch branches"),
+                          .init(names: ["commit"], description: "Duplicate of the spec's own")],
+            options: [.init(names: ["--paginate", "-P"], description: "Page the output")]),
+    ])
+    // The spec's rows keep their own descriptions; only "switch" is new.
+    let all = parser.complete(buffer: "git ", cursor: 4)
+    #expect(all.suggestions.filter { $0.display == "commit" }.count == 1)
+    #expect(all.suggestions.first { $0.display == "commit" }?.detail == "Record changes")
+    #expect(all.suggestions.contains { $0.display == "switch" && $0.detail == "Switch branches" })
+    #expect(all.path == ["git"])
+
+    #expect(parser.complete(buffer: "git sw", cursor: 6).suggestions.map(\.display) == ["switch"])
+    let option = parser.complete(buffer: "git --pa", cursor: 8).suggestions
+    #expect(option.map(\.display) == ["--paginate"])
+    #expect(option.first?.aliases == ["-P"])
+
+    // A level with no overlay is untouched, and the path names the level.
+    let deeper = parser.complete(buffer: "git checkout -", cursor: 14)
+    #expect(deeper.path == ["git", "checkout"])
+    #expect(deeper.suggestions.map(\.display) == ["-b"])
+}
+
+@Test func overlayLevelDecodesTheStoredShape() {
+    let level = OverlayLevel([
+        "subcommands": [["name": ["switch"], "description": "Switch branches"], ["name": "token"]],
+        "options": [["name": ["-P", "--paginate"], "description": "Page"]],
+    ] as [String: Any])
+    #expect(level.subcommands.map(\.names) == [["switch"], ["token"]])
+    #expect(level.subcommands[1].description == "")
+    #expect(level.options.first?.names == ["-P", "--paginate"])
+}
+
+@Test func parentFolderIsOfferedAndMatchesWhatWasTyped() throws {
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("sill-parent-\(UUID().uuidString)")
+    let inner = root.appendingPathComponent("inner")
+    try FileManager.default.createDirectory(at: inner, withIntermediateDirectories: true)
+    try FileManager.default.createDirectory(at: root.appendingPathComponent("sibling"),
+                                            withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+
+    // "cd .." — the parent is a folder like any other, and exactly what was typed.
+    let dots = TemplateResolver.suggestions(
+        templates: ["folders"], partial: Token(text: "..", typedLength: 2), cwd: inner.path)
+    #expect(dots.map(\.display) == ["../"])
+    #expect(dots[0].insertText == "..")
+    #expect(dots[0].insertsNothing(before: "cd .."))
+
+    // "cd ../" — the parent's folders are listed, with "../" itself on top so
+    // Return goes up while the arrows reach "sibling/".
+    let slashed = TemplateResolver.suggestions(
+        templates: ["folders"], partial: Token(text: "../", typedLength: 3), cwd: inner.path)
+    #expect(slashed.first?.display == "../")
+    #expect(slashed.first?.insertsNothing(before: "cd ../") == true)
+    #expect(slashed.map(\.display).contains("sibling/"))
+
+    // Deeper up-paths work the same way; a plain folder's slash does not.
+    let twice = TemplateResolver.suggestions(
+        templates: ["folders"], partial: Token(text: "../../", typedLength: 6), cwd: inner.path)
+    #expect(twice.first?.display == "../../")
+    let plain = TemplateResolver.suggestions(
+        templates: ["folders"], partial: Token(text: "inner/", typedLength: 6), cwd: root.path)
+    #expect(!plain.contains { $0.display.hasPrefix("..") })
+
+    // Generator listings (cd's) get the same entry, once.
+    let fromGenerator = [Suggestion(display: "sibling/", insertText: "../sibling", deleteCount: 3,
+                                    detail: "", kind: .folder)]
+    let merged = TemplateResolver.withParentEntry(fromGenerator, partial: Token(text: "../", typedLength: 3))
+    #expect(merged.map(\.display) == ["../", "sibling/"])
+    #expect(TemplateResolver.withParentEntry(merged, partial: Token(text: "../", typedLength: 3)).count == 2)
+}

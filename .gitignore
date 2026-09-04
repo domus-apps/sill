@@ -1,3 +1,6 @@
 .build/
 build/
 .DS_Store
+
+# Dependencies of the migrated specs (Scripts/build-specs.sh installs them)
+Specs/node_modules/

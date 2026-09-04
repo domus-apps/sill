@@ -457,7 +457,7 @@ struct GeneralSettingsView: View {
                         isOn: model.binding({ AppPreferences.learnsFromHelp },
                                             { AppPreferences.learnsFromHelp = $0 })
                     )
-                    Text(L("When a command has no spec, Sill runs it once with --help in the background and keeps what it learns on this Mac. Real programs only — shell scripts are never run."))
+                    Text(L("Runs a command once with --help in the background to learn what its definition lacks, or all of it when there is none, and keeps that on this Mac. Real programs only — shell scripts are never run."))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     HStack {

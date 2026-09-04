@@ -88,7 +88,8 @@ EXAMPLES
 @Test func parsesCobraStyleHelp() {
     let spec = HelpParser.parse(cobraHelp)
     #expect(spec.description == "Work seamlessly with GitHub from the command line.")
-    // gh's "auth:" rows keep their colon in the name; the plain rows don't.
+    // gh's "auth:" rows: the colon is layout, not part of the name.
+    #expect(spec.subcommands.map { $0.names[0] }.prefix(3) == ["auth", "browse", "pr"])
     #expect(spec.subcommands.contains { $0.names[0] == "completion" })
     #expect(spec.subcommands.contains { $0.names[0] == "help" })
     #expect(!spec.subcommands.contains { $0.names[0] == "gh" })   // the usage line

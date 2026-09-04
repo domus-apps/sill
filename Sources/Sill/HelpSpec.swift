@@ -263,12 +263,14 @@ enum HelpParser {
 
     private static func parseSubcommandRow(_ trimmed: String) -> DerivedSpec.Subcommand? {
         guard let match = trimmed.wholeMatch(of: subcommandPattern) else { return nil }
-        let name = String(match.name)
+        // gh (cobra) writes "login:   Log in…" — the colon is layout, not name.
+        let name = String(match.name).trimmingCharacters(in: CharacterSet(charactersIn: ":"))
+        guard !name.isEmpty else { return nil }
         // ALL-CAPS words are placeholders ("COMMAND"), not commands.
         guard name != name.uppercased() || name.count == 1 else { return nil }
         var names = [name]
         for alias in match.aliases.split(separator: ",") {
-            let piece = alias.trimmingCharacters(in: .whitespaces)
+            let piece = alias.trimmingCharacters(in: CharacterSet(charactersIn: ": "))
             if !piece.isEmpty, !names.contains(piece) { names.append(piece) }
         }
         return DerivedSpec.Subcommand(names: names,

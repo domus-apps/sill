@@ -106,23 +106,53 @@ final class PopupPanel {
         panel.appearance = dark.flatMap { NSAppearance(named: $0 ? .darkAqua : .aqua) }
     }
 
-    func show(_ suggestions: [Suggestion], at placement: CaretLocator.Placement) {
+    /// Where the popup was last placed, so a later resize (the loading row
+    /// appearing or going) keeps it anchored to the same caret.
+    private var lastPlacement: CaretLocator.Placement?
+
+    /// `loading` adds a row at the bottom saying a generator is still
+    /// running; with no suggestions yet, that row is the whole popup.
+    func show(_ suggestions: [Suggestion], at placement: CaretLocator.Placement,
+              loading: Bool = false) {
         let keepSelection = panel.isVisible
             && suggestions.first?.display == model.suggestions.first?.display
         model.suggestions = suggestions
+        model.isLoading = loading
         if !keepSelection {
             model.selectedIndex = 0
             userNavigated = false
         } else {
-            model.selectedIndex = min(model.selectedIndex, suggestions.count - 1)
+            model.selectedIndex = max(0, min(model.selectedIndex, suggestions.count - 1))
         }
-        let rows = min(suggestions.count, Self.maxVisibleRows)
-        let height = CGFloat(rows) * Self.rowHeight + 12
+        lastPlacement = placement
+        let height = Self.height(rows: suggestions.count, loading: loading)
         panel.setFrame(NSRect(origin: origin(for: placement, height: height),
                               size: CGSize(width: Self.width, height: height)),
                        display: true)
         panel.orderFrontRegardless()
         refreshShadow()
+    }
+
+    /// Adds or removes the loading row on a popup already up, re-fitting the
+    /// panel around the same caret.
+    func setLoading(_ loading: Bool) {
+        guard panel.isVisible, model.isLoading != loading, let placement = lastPlacement else {
+            model.isLoading = loading
+            return
+        }
+        model.isLoading = loading
+        let height = Self.height(rows: model.suggestions.count, loading: loading)
+        panel.setFrame(NSRect(origin: origin(for: placement, height: height),
+                              size: CGSize(width: Self.width, height: height)),
+                       display: true)
+        refreshShadow()
+    }
+
+    var isLoading: Bool { model.isLoading }
+
+    private static func height(rows count: Int, loading: Bool) -> CGFloat {
+        let rows = min(count, maxVisibleRows)
+        return CGFloat(rows) * rowHeight + (loading ? rowHeight : 0) + 12
     }
 
     /// Below the caret line, flipped above it when the screen edge is in the
@@ -152,6 +182,7 @@ final class PopupPanel {
     func hide() {
         panel.orderOut(nil)
         model.suggestions = []
+        model.isLoading = false
         userNavigated = false
     }
 
@@ -166,6 +197,9 @@ final class PopupPanel {
 private final class PopupModel: ObservableObject {
     @Published var suggestions: [Suggestion] = []
     @Published var selectedIndex = 0
+    /// A generator (a shell command, sometimes a network call) is still
+    /// running for this list.
+    @Published var isLoading = false
 }
 
 private struct PopupListView: View {
@@ -173,6 +207,29 @@ private struct PopupListView: View {
     var choose: (Suggestion) -> Void
 
     var body: some View {
+        VStack(spacing: 0) {
+            list
+            if model.isLoading {
+                /* Shown only once a generator has taken a while (the
+                   controller waits 150ms), so quick local ones never flash it. */
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .controlSize(.small)
+                        .frame(width: 14)
+                    Text(L("Loading…"))
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                }
+                .padding(.horizontal, PopupPanel.contentInset + 7)
+                .frame(height: 22)
+                .padding(.bottom, model.suggestions.isEmpty ? 6 : 0)
+            }
+        }
+        .environment(\.appearsActive, true)  // popup windows are never key
+    }
+
+    private var list: some View {
         ScrollViewReader { proxy in
             ScrollView(.vertical) {
                 LazyVStack(spacing: 0) {
@@ -195,7 +252,6 @@ private struct PopupListView: View {
                 proxy.scrollTo(index)
             }
         }
-        .environment(\.appearsActive, true)  // popup windows are never key
     }
 }
 

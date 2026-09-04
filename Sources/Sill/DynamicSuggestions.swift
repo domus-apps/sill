@@ -31,7 +31,7 @@ enum TemplateResolver {
             options: componentPrefix.hasPrefix(".") ? [] : [.skipsHiddenFiles])
         else { return [] }
 
-        return entries.compactMap { url -> Suggestion? in
+        var listed = entries.compactMap { url -> Suggestion? in
             let name = url.lastPathComponent
             guard let match = FuzzyMatcher.match(componentPrefix, in: name) else { return nil }
             let isDirectory =
@@ -53,6 +53,44 @@ enum TemplateResolver {
         // Folders first, then how well the name matches, then the name.
         .sorted { ($0.kind == .folder ? 0 : 1, -$0.score, $0.display)
                   < ($1.kind == .folder ? 0 : 1, -$1.score, $1.display) }
+        return withParentEntry(listed, partial: partial)
+    }
+
+    /// Puts "../" on top of a path listing when the partial asks for it (see
+    /// `parentEntry`), unless the listing already has it.
+    static func withParentEntry(_ listing: [Suggestion], partial: Token) -> [Suggestion] {
+        guard let parent = parentEntry(partial: partial),
+              !listing.contains(where: { $0.display == parent.display })
+        else { return listing }
+        return [parent] + listing
+    }
+
+    /* ".." is a folder too, though no listing contains it. Typing "." or ".."
+       offers "../" like any other folder, and "../" typed through to the
+       slash lists the parent's folders with "../" itself on top — so that
+       Return there goes up (the item is exactly what was typed), while the
+       arrow keys still reach the folders inside. */
+    static func parentEntry(partial: Token) -> Suggestion? {
+        let text = partial.text
+        let slash = text.lastIndex(of: "/")
+        let directoryPrefix = slash.map { String(text[...$0]) } ?? ""
+        let componentPrefix = slash.map { String(text[text.index(after: $0)...]) } ?? text
+        let display: String
+        let insertText: String
+        if componentPrefix == "." || componentPrefix == ".." {
+            display = directoryPrefix + "../"
+            insertText = shellEscaped(directoryPrefix + "..")
+        } else if componentPrefix.isEmpty,
+                  directoryPrefix == "../" || directoryPrefix.hasSuffix("/../") {
+            display = directoryPrefix
+            insertText = shellEscaped(directoryPrefix)
+        } else {
+            return nil
+        }
+        let matched = Array(0..<min(partial.text.count, display.count))
+        return Suggestion(display: display, insertText: insertText, deleteCount: partial.typedLength,
+                          detail: "", kind: .folder, score: 5 * 1_000,  // the exact tier: what was typed, complete
+                          matchedOffsets: matched)
     }
 
     static func shellEscaped(_ value: String) -> String {

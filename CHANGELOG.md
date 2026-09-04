@@ -4,6 +4,13 @@ All notable changes to Sill are documented here. The release workflow publishes 
 
 Keep each bullet on a single line: release notes render line breaks literally (both on GitHub and in the update dialog), so wrapped lines would break mid-sentence.
 
+## 1.5.0
+
+- A small "Loading…" row sits at the bottom of the popup while a list is still on its way, as with `npm install re`.
+- Typing `..` offers `../` like any other folder, and with `cd ../` it stays on top so Return goes up one level.
+- Newer gh commands are completed, such as `gh auth switch` and `gh auth token`.
+- With "Learn unknown commands from --help" on, a command that already has a definition also gains what that definition lacks.
+
 ## 1.4.0
 
 - Completing a folder no longer adds a trailing slash; typing one lists what is inside.

@@ -51,6 +51,16 @@ if [[ -d "$OVERRIDES" ]]; then
         < <(find "$OVERRIDES" -type f \( -name "*.ts" -o -name "*.js" -o -name "*.json" \) | sort)
 fi
 if (( ${#OVERRIDE_FILES[@]} > 0 )); then
+    # Migrated specs import the same helper packages upstream's sources do
+    # (@fig/autocomplete-generators and friends); Specs/package.json pins
+    # them and esbuild resolves them from Specs/node_modules.
+    if [[ -f Specs/package.json ]]; then
+        if command -v npm > /dev/null; then
+            (cd Specs && npm ci --no-audit --no-fund --silent)
+        else
+            (cd Specs && bun install --silent)
+        fi
+    fi
     MODULES=()
     for f in "${OVERRIDE_FILES[@]}"; do
         case "$f" in

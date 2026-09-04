@@ -13,7 +13,8 @@ if let index = CommandLine.arguments.firstIndex(of: "--complete"),
     let derived = DerivedSpecStore()
     let engine = SpecEngine(specDirectories: directories, derived: derived)
     let result = CompletionParser(
-        engine: engine, commands: CommandCatalog(specDirectories: directories, derived: derived))
+        engine: engine, commands: CommandCatalog(specDirectories: directories, derived: derived),
+        overlays: derived)
         .complete(buffer: buffer, cursor: buffer.count,
                   searchPath: ProcessInfo.processInfo.environment["PATH"] ?? "")
     for s in result.suggestions {
@@ -51,6 +52,16 @@ if let index = CommandLine.arguments.firstIndex(of: "--complete"),
     if let path = result.unexploredPath {
         print("(learned subcommand not explored yet: \(path.joined(separator: " ")))")
     }
+    exit(0)
+}
+
+/* `Sill --augment "<command> <sub…>"` reads --help at that level of a command
+   that has a spec and stores the overlay, right now. */
+if let index = CommandLine.arguments.firstIndex(of: "--augment"),
+   CommandLine.arguments.count > index + 1 {
+    let path = CommandLine.arguments[index + 1].split(separator: " ").map(String.init)
+    let searchPath = ProcessInfo.processInfo.environment["PATH"] ?? "/usr/bin:/bin"
+    print(DerivedSpecStore.augmentNow(path: path, searchPath: searchPath))
     exit(0)
 }
 

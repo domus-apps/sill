@@ -1,0 +1,15 @@
+{
+  "name": "sill-spec-overrides",
+  "private": true,
+  "description": "Dependencies the migrated completion specs in overrides/ import; installed by Scripts/build-specs.sh before bundling.",
+  "dependencies": {
+    "@fig/autocomplete-generators": "^2.4.0",
+    "@fig/autocomplete-helpers": "^2.0.0",
+    "semver": "^7.6.3",
+    "strip-json-comments": "^5.0.1",
+    "yaml": "^2.7.0"
+  },
+  "devDependencies": {
+    "@withfig/autocomplete-types": "^1.31.0"
+  }
+}

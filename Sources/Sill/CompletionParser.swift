@@ -144,6 +144,43 @@ struct CompletionResult {
     /// A learned spec's subcommand the user has reached whose own options
     /// haven't been read yet: root command name, then subcommand names.
     var unexploredPath: [String]? = nil
+    /// Where in the spec tree the caret is: the command, then the
+    /// subcommands walked — the level an overlay from `--help` attaches to.
+    var path: [String] = []
+}
+
+/// What `--help` listed at one level of a command that has a spec, for the
+/// parser to add whatever the spec lacks there (DerivedSpecStore).
+struct OverlayLevel {
+    struct Entry {
+        var names: [String]
+        var description: String
+    }
+    var subcommands: [Entry]
+    var options: [Entry]
+
+    init(subcommands: [Entry], options: [Entry]) {
+        self.subcommands = subcommands
+        self.options = options
+    }
+
+    /// From the Fig-shaped level object the store keeps.
+    init(_ object: [String: Any]) {
+        func entries(_ key: String) -> [Entry] {
+            (object[key] as? [[String: Any]] ?? []).compactMap { item in
+                let names: [String]
+                if let name = item["name"] as? String { names = [name] }
+                else { names = item["name"] as? [String] ?? [] }
+                guard !names.isEmpty else { return nil }
+                return Entry(names: names, description: item["description"] as? String ?? "")
+            }
+        }
+        self.init(subcommands: entries("subcommands"), options: entries("options"))
+    }
+}
+
+protocol OverlayProviding {
+    func overlay(for path: [String]) -> OverlayLevel?
 }
 
 /* Walks a buffer prefix against a Fig spec tree and produces ranked
@@ -155,6 +192,8 @@ struct CompletionParser {
     var recency: RecencyStore? = nil
     /// Command names to offer while the first word is being typed.
     var commands: (any CommandCatalogProviding)? = nil
+    /// Gaps in a spec, read from the command's own --help at each level.
+    var overlays: (any OverlayProviding)? = nil
 
     /// The simple command under the caret: the rightmost command of a
     /// pipeline/list, minus leading environment assignments and wrappers
@@ -197,6 +236,7 @@ struct CompletionParser {
             var result = result
             result.commandTokens = commandTokens
             result.unexploredPath = node.needsExploration ? walked : nil
+            result.path = walked
             return result
         }
 
@@ -261,8 +301,12 @@ struct CompletionParser {
                                   aliases: option.names.filter { $0 != name },
                                   priority: option.priority)
             }
+            let known = Set(node.options.flatMap(\.names))
+            let extra = overlaySuggestions(
+                overlays?.overlay(for: walked)?.options ?? [], except: known,
+                partial: partial, kind: .option)
             return finished(CompletionResult(
-                suggestions: rank(options, partial: partial.text, command: commandName)))
+                suggestions: rank(options + extra, partial: partial.text, command: commandName)))
         }
 
         var suggestions: [Suggestion] = []
@@ -283,6 +327,13 @@ struct CompletionParser {
                                   aliases: sub.names.filter { $0 != name },
                                   priority: sub.priority)
             }
+            /* Whatever `--help` lists at this level that the spec doesn't —
+               a subcommand added since the corpus was published. The spec's
+               own rows keep their descriptions and generators. */
+            let known = Set(node.subcommands.flatMap(\.names))
+            suggestions += overlaySuggestions(
+                overlays?.overlay(for: walked)?.subcommands ?? [], except: known,
+                partial: partial, kind: .subcommand)
         }
         let positional = node.args
         if argIndex < positional.count {
@@ -312,6 +363,19 @@ struct CompletionParser {
                            kind: .command)
             }
         return CompletionResult(suggestions: rank(suggestions, partial: partial.text, command: ""))
+    }
+
+    /// Rows for overlay entries whose names the spec doesn't already have.
+    private func overlaySuggestions(_ entries: [OverlayLevel.Entry], except known: Set<String>,
+                                    partial: Token, kind: Suggestion.Kind) -> [Suggestion] {
+        entries.compactMap { entry in
+            guard !entry.names.contains(where: { known.contains($0) }),
+                  let name = Self.preferredName(entry.names, matching: partial.text)
+            else { return nil }
+            return Suggestion(display: name, insertText: name, deleteCount: partial.typedLength,
+                              detail: entry.description, kind: kind,
+                              aliases: entry.names.filter { $0 != name })
+        }
     }
 
     private func argSuggestions(for arg: SpecNode, partial: Token,
