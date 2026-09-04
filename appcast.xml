@@ -179,5 +179,31 @@
         sparkle:edSignature="q2A82w1pzntF5PwYXcVKprngl7q5eJ+/29C5KcHvQcp3u6vzuV9AxbeJrKBQuZj8KvsgOCbrJBnAsiYqutaqBw==" length="3218289"
         type="application/octet-stream"/>
     </item>
+    <item>
+      <title>Sill v1.6.0</title>
+      <link>https://github.com/domus-apps/sill/releases/tag/v1.6.0</link>
+      <pubDate>Fri, 04 Sep 2026 07:59:54 +0000</pubDate>
+      <description xml:lang="en"><![CDATA[
+<ul>
+<li>In VS Code the popup opens at the current cell and holds still while you type.</li>
+<li>Text in the highlighted row turns dark on light accent colors such as yellow.</li>
+<li>Holding an arrow key stops at the end of the list, and a single press at the end wraps round.</li>
+<li>Terminal tabs opened after this update reconnect on the next keystroke when Sill is quit and relaunched, or updated.</li>
+</ul>      ]]></description>
+      <description xml:lang="ko"><![CDATA[
+<ul>
+<li>VS Code에서 팝업이 현재 커서 자리에 바로 뜨고 입력 중에도 흔들리지 않습니다.</li>
+<li>노란색처럼 밝은 강조 색에서는 강조된 행의 글자가 어두운 색으로 표시됩니다.</li>
+<li>방향키를 누르고 있으면 목록 끝에서 멈추고, 끝에서 한 번 누르면 반대편으로 넘어갑니다.</li>
+<li>이 업데이트 이후 새로 연 터미널 탭은 Sill을 종료 후 다시 실행하거나 업데이트해도 다음 키 입력에서 다시 연결됩니다.</li>
+</ul>      ]]></description>
+      <sparkle:version>7</sparkle:version>
+      <sparkle:shortVersionString>1.6.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <enclosure
+        url="https://github.com/domus-apps/sill/releases/download/v1.6.0/Sill.zip"
+        sparkle:edSignature="oBpf3e/m8GRL4tu1NFR1fFadsoC/ELKo7aPGON/fiBEVsDZ+KXmUpvmDs8eU0CJ59B0fRuc9a5PG+/D/7SyXCQ==" length="3226321"
+        type="application/octet-stream"/>
+    </item>
   </channel>
 </rss>
