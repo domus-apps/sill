@@ -5,6 +5,7 @@
     "moduleResolution": "node",
     "lib": ["ES2018", "DOM"],
     "noEmit": true,
+    "strict": true,
     "noImplicitAny": false,
     "allowSyntheticDefaultImports": true,
     "types": ["@withfig/autocomplete-types"]

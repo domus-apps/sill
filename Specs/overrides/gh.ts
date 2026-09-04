@@ -23,7 +23,7 @@ const postProcessRemoteBranches: Fig.Generator["postProcess"] = (out) => {
     // Trim and remove the remote part of the branch name (origin/, fork/...)
     let name = elm.trim().replace(/\w+\//, "");
 
-    const parts = elm.match(/\S+/g);
+    const parts = elm.match(/\S+/g) ?? [];
     if (parts.length > 1) {
       if (parts[0] === "*") {
         // We are in a detached HEAD state
@@ -58,9 +58,9 @@ interface RepoDataType {
   description: string | null;
 }
 
-const listRepoMapFunction = (repo: RepoDataType) => ({
+const listRepoMapFunction = (repo: RepoDataType): Fig.Suggestion => ({
   name: repo.nameWithOwner,
-  description: repo.description,
+  description: repo.description ?? undefined,
   //be able to see if the repo is private at a glance
   icon: repo.isPrivate ? "🔒" : "👀",
 });

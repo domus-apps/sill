@@ -23,7 +23,8 @@ Nested `loadSpec` files go in a subdirectory (`aws/s3.ts`), like upstream.
 A migrated spec keeps upstream's imports (`@fig/autocomplete-generators`,
 `@fig/autocomplete-helpers`, `semver`, `yaml`, …): `Specs/package.json` pins
 those packages and the build installs them before bundling. `Specs/tsconfig.json`
-gives editors the Fig types; nothing type-checks at build time.
+gives editors the Fig types (strict), and the build runs `npm run typecheck` in
+`Specs/` before bundling, so a spec that does not type-check never ships.
 
 The bundle version becomes `<upstream>+b2.ov.<hash>` whenever this directory
 is non-empty (`b2` is the bundle format), so a change here rolls out to users

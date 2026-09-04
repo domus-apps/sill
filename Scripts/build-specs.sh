@@ -60,6 +60,9 @@ if (( ${#OVERRIDE_FILES[@]} > 0 )); then
         else
             (cd Specs && bun install --silent)
         fi
+        # A spec that does not type-check is not bundled: the Fig types catch
+        # a null description or a misspelled key before it reaches users.
+        (cd Specs && ./node_modules/.bin/tsc --noEmit -p .)
     fi
     MODULES=()
     for f in "${OVERRIDE_FILES[@]}"; do
