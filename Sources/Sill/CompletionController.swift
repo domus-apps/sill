@@ -269,7 +269,7 @@ final class CompletionController {
        is a keystroke or more behind while typing runs ahead of the drawing,
        and following it would make the popup shake. Learned from the first
        shifted read, corrected by settled ones, forgotten with the line. */
-    private var xtermLineOrigin: [String: (x0: CGFloat, y: CGFloat)] = [:]
+    private var xtermLineOrigin: [String: (x0: CGFloat, y: CGFloat, paneX: CGFloat?)] = [:]
     /// Reads this long after the last keystroke show the caret as drawn.
     private static let xtermSettleTime: CFAbsoluteTime = 0.2
     /// One placement per buffer state: a generator answering later must not
@@ -282,12 +282,23 @@ final class CompletionController {
         var placement = CaretLocator.locate(for: session)
         if session.term == "vscode", var found = placement, found.precise {
             let cell = xtermCellWidth[session.sid] ?? found.rect.width
-            if let origin = xtermLineOrigin[session.sid], abs(origin.y - found.rect.minY) < 1 {
+            /* The remembered origin holds only while the pane stays where it
+               was: an editor group added or removed beside the terminal
+               moves the whole pane sideways mid-line (measured: 296pt, 37
+               cells), and a caret placed from the old origin sits a third
+               of the screen from the real one. The pane's own left edge is
+               the test — not the distance between the read and the origin's
+               prediction, because the read can trail a burst of backspaces
+               by many cells and would then pass for a move. */
+            if let origin = xtermLineOrigin[session.sid], abs(origin.y - found.rect.minY) < 1,
+               origin.paneX == found.paneX {
                 found.rect.origin.x = origin.x0 + CGFloat(session.cursor) * cell
+                CaretLocator.debugLine("  present: origin x0=\(Int(origin.x0)) cursor=\(session.cursor) cell=\(cell) → x=\(Int(found.rect.minX)) y=\(Int(found.rect.minY))")
             } else {
                 found.rect.origin.x += CGFloat(cursorDeltaForGeneration) * cell
                 xtermLineOrigin[session.sid] = (found.rect.minX - CGFloat(session.cursor) * cell,
-                                                found.rect.minY)
+                                                found.rect.minY, found.paneX)
+                CaretLocator.debugLine("  present: new origin (delta=\(cursorDeltaForGeneration) cell=\(cell)) → x=\(Int(found.rect.minX)) y=\(Int(found.rect.minY)) x0=\(Int(xtermLineOrigin[session.sid]!.x0))")
             }
             placement = found
         }
@@ -308,7 +319,7 @@ final class CompletionController {
         }
         xtermSettledRead[session.sid] = (x, y, session.cursor)
         let cell = xtermCellWidth[session.sid] ?? placement.rect.width
-        xtermLineOrigin[session.sid] = (x - CGFloat(session.cursor) * cell, y)
+        xtermLineOrigin[session.sid] = (x - CGFloat(session.cursor) * cell, y, placement.paneX)
     }
 
     private func present(_ suggestions: [Suggestion], for session: Session, loading: Bool = false) {
@@ -355,12 +366,15 @@ final class CompletionController {
 
     private func startPlacementWatchdog() {
         guard placementWatchdog == nil else { return }
-        placementWatchdog = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) {
+        // Brisk enough that a pane shifting under an open popup (an editor
+        // group added beside the terminal) is followed within a glance.
+        placementWatchdog = Timer.scheduledTimer(withTimeInterval: 0.12, repeats: true) {
             [weak self] _ in
             guard let self, popup.isVisible, let shown = shownPlacement else { return }
             guard let session = sessions.activeSession,
                   let now = CaretLocator.locate(for: session)
             else {
+                CaretLocator.debugLine("watchdog: hide — \(sessions.activeSession == nil ? "no active session" : "locate returned nil")")
                 hide()
                 return
             }
@@ -368,18 +382,27 @@ final class CompletionController {
             // the placement by design; judge them only once they have caught up.
             if session.term == "vscode",
                CFAbsoluteTimeGetCurrent() - lastReportAt < Self.xtermSettleTime { return }
+            /* Another row is another situation (the line wrapped, the
+               screen scrolled, a different window): hide, and the next
+               keystroke places afresh. On the same row the caret is where
+               the read says, however far it moved: a repaint after
+               placement, a cursor key, or the pane itself shifting when an
+               editor group beside it was resized. Follow it, and let the
+               settled read correct the remembered origin — hiding here
+               used to leave a stale origin in place for the rest of the
+               line, so every keystroke re-opened the popup in the wrong
+               place and every settled read hid it again. */
             guard now.precise == shown.precise,
-                  abs(now.rect.minY - shown.rect.minY) < 2,      // same line
-                  abs(now.rect.minX - shown.rect.minX) < 240     // not a window move
+                  abs(now.rect.minY - shown.rect.minY) < 2
             else {
+                CaretLocator.debugLine("watchdog: hide — now=\(Int(now.rect.minX)),\(Int(now.rect.minY)) precise=\(now.precise) shown=\(Int(shown.rect.minX)),\(Int(shown.rect.minY)) precise=\(shown.precise)")
+                xtermLineOrigin[session.sid] = nil
                 hide()
                 return
             }
             noteSettledRead(now, for: session)
-            // The caret drifted a few cells on the same line — the terminal
-            // repainted after we placed the popup, or the user moved the
-            // cursor. Follow it instead of blinking.
             if abs(now.rect.minX - shown.rect.minX) >= 1 {
+                CaretLocator.debugLine("watchdog: follow — now=\(Int(now.rect.minX)) shown=\(Int(shown.rect.minX))")
                 shownPlacement = now
                 popup.move(to: now)
             }

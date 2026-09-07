@@ -11,6 +11,11 @@ enum CaretLocator {
     struct Placement {
         var rect: CGRect     // AppKit screen coordinates (bottom-left origin)
         var precise: Bool    // false = window fallback, popup should offset
+        /// Left edge of the pane the caret was read in (VS Code: the grid
+        /// container it snapped to). Moves when the pane moves, and not
+        /// when the read merely lags the typing — the test for whether a
+        /// remembered line origin still holds.
+        var paneX: CGFloat? = nil
     }
 
     /// Electron apps we've already asked to expose their web content.
@@ -59,9 +64,11 @@ enum CaretLocator {
                corner is worse than one that arrives a keystroke later. */
             if let focused, let placement = xtermCaret(focused) {
                 xtermCarets[session.sid] = focused
+                debugLine("\(session.tty.split(separator: "/").last.map(String.init) ?? "?") xterm focused=\(describe(focused)) → \(Int(placement.rect.minX)),\(Int(placement.rect.minY))")
                 return placement
             }
             if let cached = xtermCarets[session.sid], let placement = xtermCaret(cached) {
+                debugLine("\(session.tty.split(separator: "/").last.map(String.init) ?? "?") xterm cached (focused=\(describe(focused))) → \(Int(placement.rect.minX)),\(Int(placement.rect.minY))")
                 return placement
             }
             debugLine("\(session.tty.split(separator: "/").last.map(String.init) ?? "?") "
@@ -116,7 +123,7 @@ enum CaretLocator {
     /// The xterm caret textarea last seen focused, per shell session.
     private static var xtermCarets: [String: AXUIElement] = [:]
 
-    private static func describe(_ element: AXUIElement?) -> String {
+    static func describe(_ element: AXUIElement?) -> String {
         guard let element else { return "none" }
         var roleValue: CFTypeRef?
         AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &roleValue)
@@ -143,10 +150,12 @@ enum CaretLocator {
             let rowIndex = floor((caret.minY - container.minY) / cell)
             let snapped = CGRect(x: caret.minX, y: container.minY + rowIndex * cell,
                                  width: caret.width, height: cell)
-            return Placement(rect: flipped(snapped), precise: true)
+            debugLine("  snap: caret=\(Int(caret.minX)),\(Int(caret.minY)) \(Int(caret.width))x\(Int(caret.height)) container=\(describe(parent)) rows=\(rows) rowIndex=\(Int(rowIndex))")
+            return Placement(rect: flipped(snapped), precise: true, paneX: container.minX)
         }
         // No grid-sized ancestor found — the frame itself is still better
         // than the window fallback.
+        debugLine("  snap: no grid ancestor for caret=\(Int(caret.minX)),\(Int(caret.minY)) \(Int(caret.width))x\(Int(caret.height))")
         return Placement(rect: flipped(caret), precise: true)
     }
 
@@ -242,7 +251,7 @@ enum CaretLocator {
         return handle
     }()
 
-    private static func debugLine(_ text: String) {
+    static func debugLine(_ text: String) {
         placementLog?.write(Data((text + "\n").utf8))
     }
 

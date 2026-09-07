@@ -4,6 +4,13 @@ All notable changes to Sill are documented here. The release workflow publishes 
 
 Keep each bullet on a single line: release notes render line breaks literally (both on GitHub and in the update dialog), so wrapped lines would break mid-sentence.
 
+## 1.6.4
+
+### Fixed
+
+- In VS Code, the popup stayed in the wrong place and vanished after an editor group was added or removed beside the terminal.
+- In VS Code, the popup follows the terminal more quickly when the layout changes while it is open.
+
 ## 1.6.3
 
 ### Fixed
