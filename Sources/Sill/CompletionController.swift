@@ -146,12 +146,18 @@ final class CompletionController {
                     // to hide — not before, while the shell command runs.
                     self.loadingTimer?.cancel()
                     self.loadingTimer = nil
-                    var ordered = self.recency.sorted(generated, command: command)
+                    /* Several generators answer as one list here (bun run:
+                       a folder listing and package.json's scripts), each
+                       already scored against the partial — rank them
+                       together, so "site" the script tops "site-static/"
+                       and a folder picked once doesn't sit above both. */
+                    var ordered = self.recency.ranked(generated, command: command)
                     if ordered.contains(where: { $0.kind == .folder || $0.kind == .file }) {
                         // A generator that lists paths (cd's, for one) gets
                         // the same "../" entry as the native templates.
                         ordered = TemplateResolver.withParentEntry(ordered, partial: pending.partial)
                     }
+                    self.presentedPartial = pending.partial
                     self.present(suggestions + ordered, for: session)
                 }
             }
@@ -170,18 +176,76 @@ final class CompletionController {
         } else {
             popup.setLoading(false)
         }
-        if suggestions.isEmpty, awaitingGenerators, popup.isVisible {
-            // Keep the previous list on screen until the generator answers;
-            // hiding here and re-showing 50ms later reads as a flicker on
-            // every keystroke of a path argument.
+        if suggestions.isEmpty, awaitingGenerators, popup.isVisible, let pending = result.pendingArg {
+            /* Nothing to show until the generator answers. Hiding here and
+               re-showing 50ms later reads as a flicker on every keystroke of
+               a path argument, so the list on screen is narrowed to the new
+               partial instead — the same filter the runner applies, and each
+               row's delete count moved by the characters typed. It must not
+               simply stay: its rows were built for the previous partial, and
+               Return can land before the answer does (a fast Return after
+               "cd mem" arrives in the same socket read as the last letter),
+               inserting "members" over nothing — "cd memmembers". Typing into
+               another directory ("src/", "../") is a different listing
+               altogether, which nothing on screen can be narrowed to. Hiding
+               until it arrives flashes (hide, then show, ~30ms apart), so the
+               list stays up as it was and the answer swaps it — stale for
+               that moment: `presentedBuffer` no longer matches the session, so
+               Tab and Return-insert on it are refused (`acceptInto`), and the
+               shell is told the highlighted row is exact, so Return runs the
+               line — which is what a row reading "src/" over a buffer ending
+               in "src/" means, and what the shell would do on its own. */
+            if let previous = presentedPartial,
+               let carried = Self.carried(presented, from: previous, to: pending.partial) {
+                presentedPartial = pending.partial
+                // Ranked as the answer will be, so it lands without a reshuffle.
+                present(recency.ranked(carried, command: command), for: session)
+            } else {
+                presentedPartial = nil   // nothing to carry from until the answer
+                sendPopupState()
+            }
             return
         }
+        presentedPartial = result.pendingArg?.partial
         present(suggestions, for: session)
     }
 
     private var presented: [Suggestion] = []
+    /// The argument partial `presented` was built for, when it was built
+    /// for one — the base for carrying the list across a keystroke.
+    private var presentedPartial: Token?
+    /// The buffer `presented` answers to. While the session has moved on
+    /// (a new directory typed, its listing not yet in) the list is stale:
+    /// still shown, but an accept would delete the wrong count, so refused.
+    private var presentedBuffer: (buffer: String, cursor: Int)?
+
+    private func isStale(for session: Session) -> Bool {
+        guard let built = presentedBuffer else { return true }
+        return built.buffer != session.buffer || built.cursor != session.cursor
+    }
 
     private func currentSuggestions() -> [Suggestion] { presented }
+
+    /// `presented`, narrowed from the partial it was built for to the one
+    /// now under the caret: filtered and re-scored by the runner's own
+    /// matcher, with every delete count moved by the characters that came or
+    /// went. Nil when the two partials name different directories — the
+    /// list on screen is then the wrong listing, not a wider one.
+    static func carried(_ presented: [Suggestion], from previous: Token, to current: Token) -> [Suggestion]? {
+        func directory(_ text: String) -> Substring {
+            text.lastIndex(of: "/").map { text[...$0] } ?? ""
+        }
+        guard directory(previous.text) == directory(current.text) else { return nil }
+        let query = current.text.lastIndex(of: "/").map {
+            String(current.text[current.text.index(after: $0)...])
+        } ?? current.text
+        let delta = current.typedLength - previous.typedLength
+        return GeneratorRunner.matching(presented, query: query).compactMap { s in
+            var s = s
+            s.deleteCount += delta
+            return s.deleteCount >= 0 ? s : nil
+        }
+    }
 
     /* xterm.js (VS Code) reports the caret where the terminal has DRAWN it,
        and the shell tells Sill about a keystroke before it even writes the
@@ -248,15 +312,11 @@ final class CompletionController {
     }
 
     private func present(_ suggestions: [Suggestion], for session: Session, loading: Bool = false) {
-        /* The word is finished: one suggestion left and it is exactly what
-           has been typed. There is nothing to complete, so stay out of the
-           way — Return runs the command and Tab goes to the shell, instead
-           of both being held for a completion that would change nothing. */
-        if !loading, suggestions.count == 1,
-           suggestions[0].insertsNothing(before: String(session.buffer.prefix(session.cursor))) {
-            hide()
-            return
-        }
+        /* A finished word — one suggestion left and it is exactly what has
+           been typed — still shows: the row confirms the word is known (and
+           says what it does), while Return runs the line through the popup
+           state's `exact` flag rather than inserting. Tab accepts the no-op
+           and takes the popup down. */
         guard !suggestions.isEmpty || loading, sessions.activeSession === session,
               let placement = locateForPresent(session)
         else {
@@ -264,6 +324,7 @@ final class CompletionController {
             return
         }
         presented = suggestions
+        presentedBuffer = (session.buffer, session.cursor)
         if ProcessInfo.processInfo.environment["SILL_DEBUG_PLACEMENT"] != nil {
             NSLog("Sill placement: %@ precise=%d app=%@", NSStringFromRect(placement.rect),
                   placement.precise ? 1 : 0,
@@ -281,6 +342,8 @@ final class CompletionController {
         loadingTimer?.cancel()
         loadingTimer = nil
         presented = []
+        presentedPartial = nil
+        presentedBuffer = nil
         placementWatchdog?.invalidate()
         placementWatchdog = nil
         shownPlacement = nil
@@ -329,7 +392,8 @@ final class CompletionController {
     private func sendPopupState() {
         guard let client = popupClient else { return }
         let exact = popup.isVisible && sessions[client].map { session in
-            popup.selectedSuggestion?.insertsNothing(
+            // A stale list (see `refresh`) inserts nothing either: Return runs the line.
+            isStale(for: session) || popup.selectedSuggestion?.insertsNothing(
                 before: String(session.buffer.prefix(session.cursor))) ?? false
         } ?? false
         server.send(
@@ -395,6 +459,15 @@ final class CompletionController {
     }
 
     private func acceptInto(_ session: Session, _ suggestion: Suggestion) {
+        /* A stale list (a directory typed, its listing not yet in) has rows
+           whose delete count is for text that is no longer there — better a
+           lost Tab than a mangled word. Hiding hands the keys back, so the
+           next Return runs the line. (Return itself never gets here on a
+           stale list: the popup state marks it exact and the shell runs.) */
+        guard !isStale(for: session) else {
+            hide()
+            return
+        }
         recency.record(command: presentedCommand, display: suggestion.display)
         /* Insertions carry no trailing space or slash, so the buffer the
            shell reports back still ends in the completed word — which would

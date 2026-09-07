@@ -4,6 +4,18 @@ All notable changes to Sill are documented here. The release workflow publishes 
 
 Keep each bullet on a single line: release notes render line breaks literally (both on GitHub and in the update dialog), so wrapped lines would break mid-sentence.
 
+## 1.6.1
+
+### Changed
+
+- In commands that list paths, such as `cd`, the folder list narrows with every letter as you type.
+- Items closest to what you are typing come first, ahead of ones you picked before.
+- Scripts from package.json list above files and folders whose names start the same way.
+
+### Fixed
+
+- Pressing Return right after the last letter completes the word you typed.
+
 ## 1.6.0
 
 - In VS Code the popup opens at the current cell and holds still while you type.
