@@ -321,19 +321,25 @@ enum CaretLocator {
         return screen.components(separatedBy: "\n")
     }
 
-    /* Where the caret sits in the pane's grid, in cells. The terminal's own
-       text is the better source when it has any: Ghostty exposes the screen
-       through accessibility, so the caret's row is simply the last line with
-       something on it — no round trip, and it stays right when a split
-       reflows the screen under a shell that measured its anchor at the last
-       prompt. cmux exposes no text, so there the plugin's measured anchor
-       carries it. */
+    /* Where the caret sits in the pane's grid, in cells. The plugin's
+       anchor — the terminal's own cursor report, taken at the prompt and
+       again from inside the line whenever the grid changes or the screen is
+       cleared — is the primary source while it is current. The pane's text
+       (Ghostty exposes the screen through accessibility; cmux does not)
+       covers the moment a re-measurement is still in flight: a split has
+       reflowed the screen and the fresh report has not arrived. It cannot
+       be primary, because after ⌘K Ghostty's text still lists the rows it
+       erased — 27 of them above the new prompt — so "the last line with
+       something on it" pins the caret to the bottom of a screen that shows
+       one line at the top (measured, 1.3.1). */
     private static func caretCell(in pane: (element: AXUIElement, frame: CGRect),
                                   lines: [String]?, session: Session) -> (row: Int, col: Int)? {
+        let anchored = session.anchorRow > 0
+        if anchored, session.grid?.anchorStale == false { return session.caretCell }
         if let lines, let fromScreen = caretFromScreenText(lines, session: session) {
             return fromScreen
         }
-        return session.anchorRow > 0 ? session.caretCell : nil
+        return anchored ? session.caretCell : nil
     }
 
     private static func caretFromScreenText(_ lines: [String],

@@ -319,6 +319,10 @@ _sill_send_buf() {
     local grid=""
     if (( _sill_cellw > 0 )); then
         grid=",\"row\":$_sill_row,\"col\":$_sill_col,\"cellw\":$_sill_cellw,\"cellh\":$_sill_cellh,\"tw\":$_sill_tw,\"th\":$_sill_th"
+        # A re-measurement is in flight (see _sill_request_cpr): the anchor
+        # above is the old one, and the app should place by other means
+        # until the report lands and a fresh buf follows.
+        (( _sill_cpr_pending )) && grid+=",\"stale\":true"
     elif (( _sill_nogrid )); then
         grid=",\"nogrid\":true"
     fi

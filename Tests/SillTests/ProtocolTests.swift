@@ -46,6 +46,14 @@ import Testing
     #expect(noGrid == .buffer(sid: "1-2", buf: "", cur: 0, pwd: "/x", row: 1, col: 1,
                               cols: 80, rows: 24, grid: nil, noGrid: true))
 
+    // A re-measurement in flight marks the anchor stale; absent, it is current.
+    let stale = ShellMessage.decode(Data(
+        #"{"t":"buf","sid":"1-2","buf":"","cur":0,"pwd":"/x","cols":80,"rows":24,"row":4,"col":3,"cellw":16,"cellh":34,"tw":1280,"th":816,"stale":true}"#.utf8))
+    guard case .buffer(_, _, _, _, _, _, _, _, let staleGrid, _)? = stale else { Issue.record("not a buffer"); return }
+    #expect(staleGrid?.anchorStale == true)
+    guard case .buffer(_, _, _, _, _, _, _, _, let freshGrid, _)? = gridBuf else { Issue.record("not a buffer"); return }
+    #expect(freshGrid?.anchorStale == false)
+
     #expect(ShellMessage.decode(Data(#"{"t":"end","sid":"1-2"}"#.utf8)) == .end(sid: "1-2"))
 }
 

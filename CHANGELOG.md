@@ -4,6 +4,13 @@ All notable changes to Sill are documented here. The release workflow publishes 
 
 Keep each bullet on a single line: release notes render line breaks literally (both on GitHub and in the update dialog), so wrapped lines would break mid-sentence.
 
+## 1.6.3
+
+### Fixed
+
+- In Ghostty, the popup appeared at the bottom of the window after the screen was cleared with ⌘K, then vanished.
+- In Ghostty, the popup keeps its place on a line that contains Korean or other wide characters.
+
 ## 1.6.2
 
 ### Fixed

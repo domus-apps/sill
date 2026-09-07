@@ -57,7 +57,8 @@ enum ShellMessage: Equatable {
                cellW > 0, cellH > 0 {
                 grid = GridInfo(cellPixels: CGSize(width: cellW, height: cellH),
                                 textPixels: CGSize(width: dict["tw"] as? Int ?? 0,
-                                                   height: dict["th"] as? Int ?? 0))
+                                                   height: dict["th"] as? Int ?? 0),
+                                anchorStale: dict["stale"] as? Bool ?? false)
             }
             return .buffer(sid: sid, buf: buf, cur: cur, pwd: pwd,
                            row: dict["row"] as? Int ?? 1,
@@ -85,6 +86,10 @@ enum ShellMessage: Equatable {
 struct GridInfo: Equatable {
     var cellPixels: CGSize
     var textPixels: CGSize
+    /// The plugin has asked the terminal for a fresh cursor position (the
+    /// grid changed, or the screen was cleared) and the answer is not in
+    /// yet: the anchor it sent is the old one.
+    var anchorStale: Bool = false
 }
 
 /// App → shell: whether the popup is on screen (the plugin binds/unbinds

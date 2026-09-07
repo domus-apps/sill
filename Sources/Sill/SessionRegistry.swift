@@ -46,7 +46,12 @@ final class Session {
     /// cursor offset, folding line wraps. Clamped to the grid so a stale
     /// anchor can't put the popup off-screen.
     var caretCell: (row: Int, col: Int) {
-        let index = (anchorCol - 1) + cursor
+        // In cells, not characters: Hangul and other wide glyphs take two.
+        // A cursor past the buffer's end (not something the plugin sends)
+        // counts one cell per missing character.
+        let typed = CaretLocator.displayWidth(of: String(buffer.prefix(cursor)))
+            + max(0, cursor - buffer.count)
+        let index = (anchorCol - 1) + typed
         // A wrapped line reaching the bottom scrolls the screen, effectively
         // moving the anchor up — clamping to the last row matches where the
         // caret visually ends up (a fresh anchor arrives next line-init).
