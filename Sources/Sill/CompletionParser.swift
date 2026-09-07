@@ -190,6 +190,8 @@ struct CompletionParser {
     let engine: any SpecProviding
     /// Picks the user made before, per command — orders equal matches.
     var recency: RecencyStore? = nil
+    /// Ranks without picks when no store is attached (tests).
+    private static let noRecency = RecencyStore(defaults: nil)
     /// Command names to offer while the first word is being typed.
     var commands: (any CommandCatalogProviding)? = nil
     /// Gaps in a spec, read from the command's own --help at each level.
@@ -447,20 +449,7 @@ struct CompletionParser {
             }
             return s
         }
-        let recent: (Suggestion) -> Double = { [recency] s in
-            var last = recency?.lastUse(command: command, display: s.display)
-            if command.isEmpty, let inside = recency?.lastUse(command: s.display) {
-                last = max(last ?? .distantPast, inside)
-            }
-            return last?.timeIntervalSince1970 ?? -Double.infinity
-        }
-        scored.sort {
-            if $0.score != $1.score { return $0.score > $1.score }
-            let (r0, r1) = (recent($0), recent($1))
-            if r0 != r1 { return r0 > r1 }  // picked before → first, newest first
-            if $0.priority != $1.priority { return $0.priority > $1.priority }
-            return $0.display < $1.display
-        }
+        scored = (recency ?? Self.noRecency).ranked(scored, command: command)
         if scored.count > 50 { scored.removeLast(scored.count - 50) }
         return scored
     }

@@ -210,9 +210,39 @@ struct SpyEngine: SpecProviding {
     recency.record(command: "cd", display: "c")
     Thread.sleep(forTimeInterval: 0.01)
     recency.record(command: "cd", display: "b")
-    #expect(recency.sorted(items, command: "cd").map(\.display) == ["b", "c", "a", "d"])
+    #expect(recency.ranked(items, command: "cd").map(\.display) == ["b", "c", "a", "d"])
     // Scoped per command: another command's picks don't leak.
-    #expect(recency.sorted(items, command: "ls").map(\.display) == ["a", "b", "c", "d"])
+    #expect(recency.ranked(items, command: "ls").map(\.display) == ["a", "b", "c", "d"])
+}
+
+/* `bun run site` in a project with a "site" script, a site-static/ folder,
+   and a design-tokens/ folder picked by mistake once: the fig spec lists
+   files and scripts from two generators, and the merged list must read as
+   one — the exact word first, then by match, with the picked folder only
+   winning among equals. */
+@Test func generatedListRanksMatchQualityAboveRecencyAndPriorityAboveName() {
+    let recency = RecencyStore(defaults: nil)
+    recency.record(command: "bun", display: "preview-site")
+    Thread.sleep(forTimeInterval: 0.01)
+    recency.record(command: "bun", display: "design-tokens/")
+    let folder = { (name: String) in
+        Suggestion(display: name, insertText: name, deleteCount: 0, detail: "", kind: .folder)
+    }
+    let script = { (name: String) in
+        Suggestion(display: name, insertText: name, deleteCount: 0, detail: "", kind: .argument,
+                   priority: 51)
+    }
+    let listed = GeneratorRunner.matching([folder("design-tokens/"), folder("site-static/")], query: "site")
+    let scripts = GeneratorRunner.matching([script("dev"), script("build-site"), script("preview-site"), script("site")],
+                                           query: "site")
+    #expect(recency.ranked(listed + scripts, command: "bun").map(\.display)
+        == ["site", "site-static/", "preview-site", "build-site", "design-tokens/"])
+
+    // With "de" typed, the script and the folder are both prefix matches;
+    // the spec's priority puts the script first.
+    let de = GeneratorRunner.matching([folder("design-tokens/"), folder("node_modules/"), script("dev")],
+                                      query: "de")
+    #expect(recency.ranked(de, command: "npm").map(\.display) == ["dev", "design-tokens/", "node_modules/"])
 }
 
 // MARK: - A finished word offers nothing

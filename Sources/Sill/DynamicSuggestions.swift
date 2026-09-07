@@ -214,6 +214,7 @@ final class GeneratorRunner {
                     guard !name.isEmpty else { continue }
                     suggestions.append(makeSuggestion(name, detail: node.specDescription,
                                                       insertValue: node.insertValue,
+                                                      priority: node.priority,
                                                       partial: partial))
                 }
             }
@@ -244,11 +245,12 @@ final class GeneratorRunner {
     }
 
     private func makeSuggestion(_ name: String, detail: String, insertValue: String?,
-                                partial: Token) -> Suggestion {
+                                priority: Int = 50, partial: Token) -> Suggestion {
         let insert = insertValue.map { Self.withoutTrailingSlash(CompletionParser.stripCursorMark($0)) }
             ?? Self.insertion(for: name)
         return Suggestion(display: name, insertText: insert,
-                          deleteCount: partial.typedLength, detail: detail, kind: .argument)
+                          deleteCount: partial.typedLength, detail: detail, kind: .argument,
+                          priority: priority)
     }
 
     // MARK: - Custom generators (fig's filepaths() and friends)

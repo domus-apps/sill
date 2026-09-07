@@ -42,14 +42,35 @@ final class RecencyStore {
         defaults?.set(uses, forKey: Self.key)
     }
 
-    /// Stable reorder: most recently picked first, never-picked keep their
-    /// existing order after them.
-    func sorted(_ suggestions: [Suggestion], command: String) -> [Suggestion] {
-        let stamped = suggestions.enumerated().map { index, s in
-            (s, uses[Self.id(command, s.display)] ?? -Double.infinity, index)
+    /* The one order every list is shown in, whatever produced its rows —
+       the parser's static words, a folder listing, a generator's output,
+       or several of those merged:
+
+         1. how well the typed text matches (FuzzyMatcher's tiers, in
+            `score`) — an exact word beats a prefix beats a fuzzy hit, so a
+            recently used item never outranks what you're visibly typing
+            toward;
+         2. among equal matches, what was picked before, newest first;
+         3. then the spec's priority — fig marks package.json scripts 51
+            so they sit above the files and folders (50) listed beside them
+            for `bun run`;
+         4. then the name.
+
+       Stable, so a generator's own order survives among true equals. */
+    func ranked(_ suggestions: [Suggestion], command: String) -> [Suggestion] {
+        let recent: (Suggestion) -> Double = { [self] s in
+            var last = lastUse(command: command, display: s.display)
+            if command.isEmpty, let inside = lastUse(command: s.display) {
+                last = max(last ?? .distantPast, inside)
+            }
+            return last?.timeIntervalSince1970 ?? -Double.infinity
         }
+        let stamped = suggestions.enumerated().map { index, s in (s, recent(s), index) }
         return stamped.sorted {
-            if $0.1 != $1.1 { return $0.1 > $1.1 }
+            if $0.0.score != $1.0.score { return $0.0.score > $1.0.score }
+            if $0.1 != $1.1 { return $0.1 > $1.1 }  // picked before → first, newest first
+            if $0.0.priority != $1.0.priority { return $0.0.priority > $1.0.priority }
+            if $0.0.display != $1.0.display { return $0.0.display < $1.0.display }
             return $0.2 < $1.2
         }.map(\.0)
     }
