@@ -357,5 +357,53 @@
         sparkle:edSignature="yuSglEA47dtWg0WcKELQ1sHjpiyz0I8S5sAVo2JVVQY4/ZCbWf0+2JUcZXGTB8EwdCtQpBA6gDfXMqpXGhS8CA==" length="3224978"
         type="application/octet-stream"/>
     </item>
+    <item>
+      <title>Sill v1.6.4</title>
+      <link>https://github.com/domus-apps/sill/releases/tag/v1.6.4</link>
+      <pubDate>Mon, 07 Sep 2026 23:58:06 +0000</pubDate>
+      <description xml:lang="en"><![CDATA[
+<h2>1.6.4</h2>
+<h3>Fixed</h3>
+<ul>
+<li>In VS Code, the popup stayed in the wrong place and vanished after an editor group was added or removed beside the terminal.</li>
+<li>In VS Code, the popup follows the terminal more quickly when the layout changes while it is open.</li>
+</ul>
+<h2>1.6.3</h2>
+<h3>Fixed</h3>
+<ul>
+<li>In Ghostty, the popup appeared at the bottom of the window after the screen was cleared with ⌘K, then vanished.</li>
+<li>In Ghostty, the popup keeps its place on a line that contains Korean or other wide characters.</li>
+</ul>
+<h2>1.6.2</h2>
+<h3>Fixed</h3>
+<ul>
+<li>Fixed steady processor use that began once Settings had been opened and went on after the window was closed.</li>
+</ul>      ]]></description>
+      <description xml:lang="ko"><![CDATA[
+<h2>1.6.4</h2>
+<h3>수정</h3>
+<ul>
+<li>VS Code에서 터미널 옆에 에디터 그룹을 추가하거나 닫은 뒤 팝업이 엉뚱한 자리에 뜨고 사라지던 문제를 고쳤습니다.</li>
+<li>VS Code에서 팝업이 열린 채로 화면 배치가 바뀌면 터미널을 더 빨리 따라갑니다.</li>
+</ul>
+<h2>1.6.3</h2>
+<h3>수정</h3>
+<ul>
+<li>Ghostty에서 ⌘K로 화면을 지운 뒤 팝업이 창 맨 아래에 나타났다가 사라지던 문제를 고쳤습니다.</li>
+<li>Ghostty에서 한글처럼 폭이 넓은 글자가 있는 줄에서도 팝업이 제자리에 표시됩니다.</li>
+</ul>
+<h2>1.6.2</h2>
+<h3>수정</h3>
+<ul>
+<li>설정 창을 한 번 열면 창을 닫은 뒤에도 CPU를 계속 사용하던 문제를 고쳤습니다.</li>
+</ul>      ]]></description>
+      <sparkle:version>12</sparkle:version>
+      <sparkle:shortVersionString>1.6.4</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <enclosure
+        url="https://github.com/domus-apps/sill/releases/download/v1.6.4/Sill.zip"
+        sparkle:edSignature="Z8p5zl1NeB7y1vlSjZlJethDMYo+yZOH83IFpVzE9uIuFE9gGPdrFiPNMLRE0f9ys0NwYkNBay0u1D2PQQOcBA==" length="3230051"
+        type="application/octet-stream"/>
+    </item>
   </channel>
 </rss>
