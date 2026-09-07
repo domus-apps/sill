@@ -239,5 +239,65 @@
         sparkle:edSignature="iEoaW8bX+w5VZZ/LKQ4bHsmkTM3klcRst6Ll1lgrqquYg49VnCE/9z0mKUT+sm9bqB5QMQ/Mog+b0tEOC1RSDQ==" length="3224852"
         type="application/octet-stream"/>
     </item>
+    <item>
+      <title>Sill v1.6.2</title>
+      <link>https://github.com/domus-apps/sill/releases/tag/v1.6.2</link>
+      <pubDate>Mon, 07 Sep 2026 07:15:05 +0000</pubDate>
+      <description xml:lang="en"><![CDATA[
+<h2>1.6.2</h2>
+<h3>Fixed</h3>
+<ul>
+<li>Fixed steady processor use that began once Settings had been opened and went on after the window was closed.</li>
+</ul>
+<h2>1.6.1</h2>
+<h3>Changed</h3>
+<ul>
+<li>In commands that list paths, such as <code class="notranslate">cd</code>, the folder list narrows with every letter as you type.</li>
+<li>Items closest to what you are typing come first, ahead of ones you picked before.</li>
+<li>Scripts from package.json list above files and folders whose names start the same way.</li>
+</ul>
+<h3>Fixed</h3>
+<ul>
+<li>Pressing Return right after the last letter completes the word you typed.</li>
+</ul>
+<h2>1.6.0</h2>
+<ul>
+<li>In VS Code the popup opens at the current cell and holds still while you type.</li>
+<li>Text in the highlighted row turns dark on light accent colors such as yellow.</li>
+<li>Holding an arrow key stops at the end of the list, and a single press at the end wraps round.</li>
+<li>Terminal tabs opened after this update reconnect on the next keystroke when Sill is quit and relaunched, or updated.</li>
+</ul>      ]]></description>
+      <description xml:lang="ko"><![CDATA[
+<h2>1.6.2</h2>
+<h3>수정</h3>
+<ul>
+<li>설정 창을 한 번 열면 창을 닫은 뒤에도 CPU를 계속 사용하던 문제를 고쳤습니다.</li>
+</ul>
+<h2>1.6.1</h2>
+<h3>변경</h3>
+<ul>
+<li><code class="notranslate">cd</code>처럼 경로를 입력하는 명령에서는 글자를 칠 때마다 폴더 목록이 곧바로 좁혀집니다.</li>
+<li>지금 입력하는 글자와 가장 잘 맞는 항목이 맨 위에 옵니다. 예전에 선택했던 항목이라도 그보다 위에 오지 않습니다.</li>
+<li>package.json에 정의된 스크립트는 이름이 비슷한 파일이나 폴더보다 위에 표시됩니다.</li>
+</ul>
+<h3>수정</h3>
+<ul>
+<li>마지막 글자를 입력한 직후 바로 Return을 눌러도 단어가 제대로 완성됩니다.</li>
+</ul>
+<h2>1.6.0</h2>
+<ul>
+<li>VS Code에서 팝업이 현재 커서 자리에 바로 뜨고 입력 중에도 흔들리지 않습니다.</li>
+<li>노란색처럼 밝은 강조 색에서는 강조된 행의 글자가 어두운 색으로 표시됩니다.</li>
+<li>방향키를 누르고 있으면 목록 끝에서 멈추고, 끝에서 한 번 누르면 반대편으로 넘어갑니다.</li>
+<li>이 업데이트 이후 새로 연 터미널 탭은 Sill을 종료 후 다시 실행하거나 업데이트해도 다음 키 입력에서 다시 연결됩니다.</li>
+</ul>      ]]></description>
+      <sparkle:version>10</sparkle:version>
+      <sparkle:shortVersionString>1.6.2</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <enclosure
+        url="https://github.com/domus-apps/sill/releases/download/v1.6.2/Sill.zip"
+        sparkle:edSignature="CuU/m3Pl95JCa6G+myAxAR+k0EcKRQhpiId4+dBP6FPe19g5DwnbgidBOK4cR/8IuXaayTRbzo8YPKCqZRbIDQ==" length="3224853"
+        type="application/octet-stream"/>
+    </item>
   </channel>
 </rss>
