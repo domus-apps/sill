@@ -175,12 +175,20 @@ final class SettingsSidebarViewController: NSViewController, NSTableViewDataSour
     private func updateScrollEdgeFade() {
         let restTop = -scrollView.contentInsets.top
         let atRest = scrollView.contentView.bounds.minY <= restTop + 0.5
+        let target: CGFloat = atRest ? 0 : 1
+        /* Only when the value changes. The animator sets the model value at
+           once, so a pocket already at the target is skipped. Starting an
+           animation on every layout pass dirtied the view for the next
+           commit, which laid the sidebar out again, which started another
+           animation: a loop that kept each app near 7% CPU for as long as
+           it ran, the closed (retained) Settings window included. */
         for subview in scrollView.subviews
-        where String(describing: type(of: subview)) == "NSScrollPocket" {
+        where String(describing: type(of: subview)) == "NSScrollPocket"
+            && subview.alphaValue != target {
             NSAnimationContext.runAnimationGroup { context in
                 context.duration = 0.35
                 context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-                subview.animator().alphaValue = atRest ? 0 : 1
+                subview.animator().alphaValue = target
             }
         }
     }
