@@ -68,6 +68,15 @@ final class CompletionController {
     // MARK: - Session events
 
     func bufferChanged(_ session: Session) {
+        /* A recalled command is not something being typed toward: showing a
+           list for its last word would catch the next arrow, which is meant
+           for the command before it. Down until a keystroke changes the
+           buffer (a --help spec landing meanwhile re-enters here and stays
+           down too). */
+        if session.fromHistory {
+            hide()
+            return
+        }
         if let suppressed = suppressedBuffer {
             if session.buffer == suppressed {
                 hide()  // Esc, or a just-completed word echoing back

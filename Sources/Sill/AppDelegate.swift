@@ -95,9 +95,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 NSLog("Sill: hello term=%@ dark=%@", term, dark.map { "\($0)" } ?? "unknown")
             }
         case .buffer(_, let buf, let cur, let pwd, let row, let col, let cols, let rows,
-                     let grid, let noGrid):
+                     let grid, let noGrid, let fromHistory):
             guard let session = sessions[client] else { return }
             session.buffer = buf
+            session.fromHistory = fromHistory
             session.cursor = cur
             session.pwd = pwd
             session.cols = cols

@@ -49,10 +49,18 @@ import Testing
     // A re-measurement in flight marks the anchor stale; absent, it is current.
     let stale = ShellMessage.decode(Data(
         #"{"t":"buf","sid":"1-2","buf":"","cur":0,"pwd":"/x","cols":80,"rows":24,"row":4,"col":3,"cellw":16,"cellh":34,"tw":1280,"th":816,"stale":true}"#.utf8))
-    guard case .buffer(_, _, _, _, _, _, _, _, let staleGrid, _)? = stale else { Issue.record("not a buffer"); return }
+    guard case .buffer(_, _, _, _, _, _, _, _, let staleGrid, _, _)? = stale else { Issue.record("not a buffer"); return }
     #expect(staleGrid?.anchorStale == true)
-    guard case .buffer(_, _, _, _, _, _, _, _, let freshGrid, _)? = gridBuf else { Issue.record("not a buffer"); return }
+    guard case .buffer(_, _, _, _, _, _, _, _, let freshGrid, _, _)? = gridBuf else { Issue.record("not a buffer"); return }
     #expect(freshGrid?.anchorStale == false)
+
+    // A buffer put there by a history widget is flagged; a typed one is not.
+    let recalled = ShellMessage.decode(Data(
+        #"{"t":"buf","sid":"1-2","buf":"git commit -m x","cur":15,"pwd":"/x","cols":80,"rows":24,"hist":true}"#.utf8))
+    guard case .buffer(_, _, _, _, _, _, _, _, _, _, let fromHistory)? = recalled else { Issue.record("not a buffer"); return }
+    #expect(fromHistory == true)
+    guard case .buffer(_, _, _, _, _, _, _, _, _, _, let typed)? = buf else { Issue.record("not a buffer"); return }
+    #expect(typed == false)
 
     #expect(ShellMessage.decode(Data(#"{"t":"end","sid":"1-2"}"#.utf8)) == .end(sid: "1-2"))
 }

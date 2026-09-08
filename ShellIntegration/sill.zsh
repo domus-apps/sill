@@ -311,7 +311,21 @@ _sill_send_buf() {
         # the shell redraw the prompt at the top — same prompt, new row.
         _sill_request_cpr
     fi
-    local state="$BUFFER"$'\x1f'"$CURSOR"
+    # A line that history put here was not typed: the popup stays down for
+    # it, or the next arrow — meant for the previous command — would land in
+    # the list instead. Everything that recalls or searches history counts
+    # (zsh's own widgets, oh-my-zsh's *-beginning-search, ^R's incremental
+    # search, history-substring-search, fzf and atuin), told apart by the
+    # widget that just ran. Typing again clears it: the buf that follows is
+    # not flagged and the app resumes.
+    local hist=""
+    case "$LASTWIDGET" in
+        (*history*|*-search*|up-line-or-*|down-line-or-*|*atuin*) hist=",\"hist\":true" ;;
+    esac
+    # Inside ^R's search loop LASTWIDGET still names the widget before it;
+    # the isearch hooks below keep this flag for the duration.
+    (( _sill_in_isearch )) && hist=",\"hist\":true"
+    local state="$BUFFER"$'\x1f'"$CURSOR$hist"
     [[ "$state" == "$_sill_last" ]] && return 0
     _sill_last=$state
     # Only once there is a measurement to send: zeros would read as a grid
@@ -326,7 +340,7 @@ _sill_send_buf() {
     elif (( _sill_nogrid )); then
         grid=",\"nogrid\":true"
     fi
-    _sill_send "{\"t\":\"buf\",\"sid\":\"$_sill_sid\",\"buf\":\"$(_sill_esc "$BUFFER")\",\"cur\":$CURSOR,\"pwd\":\"$(_sill_esc "$PWD")\",\"cols\":$COLUMNS,\"rows\":$LINES$grid}"
+    _sill_send "{\"t\":\"buf\",\"sid\":\"$_sill_sid\",\"buf\":\"$(_sill_esc "$BUFFER")\",\"cur\":$CURSOR,\"pwd\":\"$(_sill_esc "$PWD")\",\"cols\":$COLUMNS,\"rows\":$LINES$grid$hist}"
 }
 
 _sill_reply_handler() {
@@ -602,7 +616,13 @@ _sill_precmd() {
     _sill_measure_grid
 }
 
+typeset -g _sill_in_isearch=0
+_sill_isearch_update() { _sill_in_isearch=1 }
+_sill_isearch_exit() { _sill_in_isearch=0 }
+
 add-zle-hook-widget zle-line-init _sill_line_init
 add-zle-hook-widget zle-line-pre-redraw _sill_send_buf
 add-zle-hook-widget zle-line-finish _sill_line_finish
+add-zle-hook-widget zle-isearch-update _sill_isearch_update
+add-zle-hook-widget zle-isearch-exit _sill_isearch_exit
 add-zsh-hook precmd _sill_precmd

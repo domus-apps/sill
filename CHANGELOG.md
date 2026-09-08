@@ -4,6 +4,12 @@ All notable changes to Sill are documented here. The release workflow publishes 
 
 Keep each bullet on a single line: release notes render line breaks literally (both on GitHub and in the update dialog), so wrapped lines would break mid-sentence.
 
+## 1.6.5
+
+### Changed
+
+- A command recalled from history with the arrow keys or ⌃R opens no popup, so the next arrow keeps moving through history. Typing on that line brings the popup back.
+
 ## 1.6.4
 
 ### Fixed

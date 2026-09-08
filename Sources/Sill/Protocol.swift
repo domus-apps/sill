@@ -15,9 +15,11 @@ enum ShellMessage: Equatable {
     /// terminal's pixel geometry — both only from terminals the plugin
     /// queries itself (Ghostty, cmux), see GridInfo; the caret cell is
     /// derived from `cur` and `cols`.
+    /// `fromHistory`: the buffer was put there by a history widget (arrow
+    /// recall, ^R search) rather than typed — no popup for it.
     case buffer(sid: String, buf: String, cur: Int, pwd: String,
                 row: Int, col: Int, cols: Int, rows: Int, grid: GridInfo?,
-                noGrid: Bool)
+                noGrid: Bool, fromHistory: Bool = false)
     /// A steering key the plugin consumed while the popup was up ("tab",
     /// "up", "down", "ret", "esc"). ZLE receives keys regardless of Secure
     /// Keyboard Entry — the shell is the legitimate recipient — which is
@@ -27,7 +29,7 @@ enum ShellMessage: Equatable {
 
     var sid: String {
         switch self {
-        case .hello(let sid, _, _, _, _, _), .buffer(let sid, _, _, _, _, _, _, _, _, _),
+        case .hello(let sid, _, _, _, _, _), .buffer(let sid, _, _, _, _, _, _, _, _, _, _),
              .key(let sid, _), .end(let sid):
             return sid
         }
@@ -66,7 +68,8 @@ enum ShellMessage: Equatable {
                            cols: dict["cols"] as? Int ?? 80,
                            rows: dict["rows"] as? Int ?? 24,
                            grid: grid,
-                           noGrid: dict["nogrid"] as? Bool ?? false)
+                           noGrid: dict["nogrid"] as? Bool ?? false,
+                           fromHistory: dict["hist"] as? Bool ?? false)
         case "key":
             guard let key = dict["key"] as? String else { return nil }
             return .key(sid: sid, key: key)
