@@ -453,5 +453,51 @@
         sparkle:edSignature="X2nsQ0nwW9vzgO7Y//QUeLW/dBIdK30Lqe13x3X1GIaARirhiDZwoXsaKK/DasE4agJ3uCJ4ZQhd26mlRh5BBg==" length="3230904"
         type="application/octet-stream"/>
     </item>
+    <item>
+      <title>Sill v1.6.6</title>
+      <link>https://github.com/domus-apps/sill/releases/tag/v1.6.6</link>
+      <pubDate>Thu, 10 Sep 2026 05:25:45 +0000</pubDate>
+      <description xml:lang="en"><![CDATA[
+<h2>1.6.6</h2>
+<h3>Fixed</h3>
+<ul>
+<li>Closing Settings or the welcome window now returns you to the app you were using, so other apps' shortcuts keep working right away.</li>
+</ul>
+<h2>1.6.5</h2>
+<h3>Changed</h3>
+<ul>
+<li>A command recalled from history with the arrow keys or ⌃R opens no popup, so the next arrow keeps moving through history. Typing on that line brings the popup back.</li>
+</ul>
+<h2>1.6.4</h2>
+<h3>Fixed</h3>
+<ul>
+<li>In VS Code, the popup stayed in the wrong place and vanished after an editor group was added or removed beside the terminal.</li>
+<li>In VS Code, the popup follows the terminal more quickly when the layout changes while it is open.</li>
+</ul>      ]]></description>
+      <description xml:lang="ko"><![CDATA[
+<h2>1.6.6</h2>
+<h3>수정</h3>
+<ul>
+<li>설정 창이나 시작 안내 창을 닫으면 이전에 쓰던 앱으로 바로 돌아가, 다른 앱의 단축키가 곧바로 동작합니다.</li>
+</ul>
+<h2>1.6.5</h2>
+<h3>변경</h3>
+<ul>
+<li>방향키나 ⌃R로 히스토리에서 불러온 명령에는 팝업이 뜨지 않아, 이어서 누르는 방향키가 그대로 히스토리를 넘깁니다. 그 줄에 글자를 입력하면 팝업이 다시 나타납니다.</li>
+</ul>
+<h2>1.6.4</h2>
+<h3>수정</h3>
+<ul>
+<li>VS Code에서 터미널 옆에 에디터 그룹을 추가하거나 닫은 뒤 팝업이 엉뚱한 자리에 뜨고 사라지던 문제를 고쳤습니다.</li>
+<li>VS Code에서 팝업이 열린 채로 화면 배치가 바뀌면 터미널을 더 빨리 따라갑니다.</li>
+</ul>      ]]></description>
+      <sparkle:version>14</sparkle:version>
+      <sparkle:shortVersionString>1.6.6</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <enclosure
+        url="https://github.com/domus-apps/sill/releases/download/v1.6.6/Sill.zip"
+        sparkle:edSignature="o4Ou1Kj8poqf6Vweo1v1a2MQJa/UdwhB0Oa3+dg9xLidGE7Fc97vzzQfs8ky3IxdiXE+ThuKhT/1DrVmX+hIAQ==" length="3231671"
+        type="application/octet-stream"/>
+    </item>
   </channel>
 </rss>
