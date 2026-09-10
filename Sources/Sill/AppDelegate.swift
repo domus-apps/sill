@@ -143,30 +143,74 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if settingsWindow == nil {
             settingsWindow = SettingsWindowController(updater: updater, specStore: specStore,
                                                       derivedSpecs: derivedSpecs)
-            if let window = settingsWindow?.window {
-                NotificationCenter.default.addObserver(
-                    forName: NSWindow.willCloseNotification, object: window, queue: .main
-                ) { [weak self] _ in
-                    /* isVisible is still true inside willClose; re-evaluate
-                       (and leave the Dock) on the next runloop cycle. */
-                    DispatchQueue.main.async { self?.updateActivationPolicy() }
-                }
-            }
+            observeClose(of: settingsWindow?.window)
         }
         /* Accessory apps don't come forward on their own — the cooperative
            `activate()` is routinely refused for them, leaving the window
            behind the current app and without key focus. Force it, like the
            other Domus apps do. */
-        NSApp.activate(ignoringOtherApps: true)
+        comeForward()
         settingsWindow?.showWindow(nil)
         settingsWindow?.window?.makeKeyAndOrderFront(nil)
         updateActivationPolicy()
     }
 
+    /* Activation hand-back. An accessory app that activates itself to show
+       a window stays the active app after that window closes — macOS never
+       moves activation on window close — so a windowless Sill would be left
+       frontmost until the user clicked elsewhere. Anything keyed off the
+       frontmost app then misbehaves (Atrium's Option+` lists the front app's
+       windows and finds none; plain keys beep). Remember who was active
+       before we came forward and give activation back once our last window
+       is gone. */
+    private var previouslyActiveApp: NSRunningApplication?
+
+    private func comeForward() {
+        if !NSApp.isActive,
+            let front = NSWorkspace.shared.frontmostApplication,
+            front.processIdentifier != ProcessInfo.processInfo.processIdentifier
+        {
+            previouslyActiveApp = front
+        }
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func handBackActivationIfWindowless() {
+        guard NSApp.isActive, settingsWindow?.window?.isVisible != true,
+            onboardingWindow?.window?.isVisible != true
+        else { return }
+        let previous = previouslyActiveApp
+        previouslyActiveApp = nil
+        if let previous, !previous.isTerminated,
+            previous.activate(from: .current, options: [])
+        {
+            return
+        }
+        /* No one to hand back to (quit meanwhile): hiding yields activation
+           to whatever the system picks next. */
+        NSApp.hide(nil)
+    }
+
+    private func observeClose(of window: NSWindow?) {
+        guard let window else { return }
+        NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification, object: window, queue: .main
+        ) { [weak self] _ in
+            /* isVisible is still true inside willClose; re-evaluate (leave the Dock, hand
+               activation back) on the next runloop cycle. */
+            DispatchQueue.main.async {
+                self?.updateActivationPolicy()
+                self?.handBackActivationIfWindowless()
+            }
+        }
+    }
+
     private func showOnboarding() {
         if onboardingWindow == nil {
             onboardingWindow = OnboardingWindowController()
+            observeClose(of: onboardingWindow?.window)
         }
+        comeForward()
         onboardingWindow?.present()
     }
 

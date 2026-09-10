@@ -4,6 +4,12 @@ All notable changes to Sill are documented here. The release workflow publishes 
 
 Keep each bullet on a single line: release notes render line breaks literally (both on GitHub and in the update dialog), so wrapped lines would break mid-sentence.
 
+## 1.6.6
+
+### Fixed
+
+- Closing Settings or the welcome window now returns you to the app you were using, so other apps' shortcuts keep working right away.
+
 ## 1.6.5
 
 ### Changed
