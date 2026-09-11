@@ -4,6 +4,12 @@ All notable changes to Sill are documented here. The release workflow publishes 
 
 Keep each bullet on a single line: release notes render line breaks literally (both on GitHub and in the update dialog), so wrapped lines would break mid-sentence.
 
+## 1.6.9
+
+### Fixed
+
+- The app icon's background looked flat in the Dock and Finder. It now shows its gradient.
+
 ## 1.6.8
 
 ### Fixed

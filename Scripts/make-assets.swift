@@ -86,6 +86,11 @@ let designRect = CGRect(x: 0, y: 0, width: 1024, height: 1024)
 let bgRect = CGRect(x: 100, y: 100, width: 824, height: 824) // standard macOS icon grid
 
 /// Background layer: squircle, graphite gradient, top sheen, outer shadow.
+/// The two stops of the ground: the same pair the Icon Composer document's
+/// fill is written from below, so the Dock and the rendered PNG agree.
+let groundTop: UInt32 = 0x6B7688
+let groundBottom: UInt32 = 0x2E3745
+
 func drawIconBackground(_ cg: CGContext) {
     let shape = squircle(in: bgRect)
 
@@ -101,7 +106,7 @@ func drawIconBackground(_ cg: CGContext) {
        drop (ΔL≈20%) from top to bottom. */
     linearGradient(
         cg, in: shape,
-        colors: [color(0x6B7688), color(0x2E3745)],
+        colors: [color(groundTop), color(groundBottom)],
         from: CGPoint(x: 512, y: bgRect.maxY), to: CGPoint(x: 512, y: bgRect.minY)
     )
     // Barely-there top light for depth
@@ -548,3 +553,22 @@ withContext(og) { cg in
     drawSocialPreview(cg, icon: bannerIcon)
 }
 savePNG(og, "Assets/og-image.png")
+
+/* Keep the Icon Composer document's background in step with the icon's own
+   gradient. macOS 26 renders the document (not the PNG above), and its
+   single-color automatic-gradient came out nearly flat in the Dock, while
+   the family's two high-chroma stops lived only in the PNG. Only the fill
+   is rewritten; the layer groups stay as authored. */
+let iconDocumentPath = "Assets/AppIcon.icon/icon.json"
+if let data = FileManager.default.contents(atPath: iconDocumentPath),
+   var document = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+    func srgb(_ hex: UInt32) -> String {
+        let r = Double((hex >> 16) & 0xFF) / 255, g = Double((hex >> 8) & 0xFF) / 255, b = Double(hex & 0xFF) / 255
+        return String(format: "extended-srgb:%.5f,%.5f,%.5f,1.00000", r, g, b)
+    }
+    document["fill"] = ["linear-gradient": [srgb(groundTop), srgb(groundBottom)]]
+    let out = try! JSONSerialization.data(
+        withJSONObject: document, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
+    try! (String(data: out, encoding: .utf8)! + "\n").write(toFile: iconDocumentPath, atomically: true, encoding: .utf8)
+    print("wrote \(iconDocumentPath)")
+}

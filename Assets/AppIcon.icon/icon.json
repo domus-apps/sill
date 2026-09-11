@@ -1,21 +1,24 @@
 {
-  "fill": {
-    "automatic-gradient": "extended-srgb:0.27843,0.31373,0.38431,1.00000"
+  "fill" : {
+    "linear-gradient" : [
+      "extended-srgb:0.41961,0.46275,0.53333,1.00000",
+      "extended-srgb:0.18039,0.21569,0.27059,1.00000"
+    ]
   },
-  "groups": [
+  "groups" : [
     {
-      "layers": [
+      "layers" : [
         {
-          "image-name": "front.png",
-          "name": "front"
+          "image-name" : "front.png",
+          "name" : "front"
         }
       ]
     }
   ],
-  "supported-platforms": {
-    "circles": [
+  "supported-platforms" : {
+    "circles" : [
       "watchOS"
     ],
-    "squares": "shared"
+    "squares" : "shared"
   }
 }
