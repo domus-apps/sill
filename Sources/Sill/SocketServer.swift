@@ -12,9 +12,17 @@ final class SocketServer {
     var onMessage: ((ClientID, ShellMessage) -> Void)?
     var onDisconnect: ((ClientID) -> Void)?
 
-    static let socketURL = FileManager.default
-        .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        .appendingPathComponent("Sill/sill.sock")
+    /* SILL_SOCKET overrides the path so a development build can run beside
+       the installed app and be driven by a test shell (see STATUS.md's zpty
+       harness notes) without stealing the real sessions. */
+    static let socketURL: URL = {
+        if let override = ProcessInfo.processInfo.environment["SILL_SOCKET"] {
+            return URL(fileURLWithPath: override)
+        }
+        return FileManager.default
+            .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Sill/sill.sock")
+    }()
 
     private var listenFD: Int32 = -1
     private var acceptSource: DispatchSourceRead?

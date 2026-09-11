@@ -32,6 +32,8 @@ final class CompletionController {
     private var placementWatchdog: Timer?
     /// Drops generator replies that arrive after the buffer moved on.
     private var generation = 0
+    /// SILL_DEBUG_POPUP=1 logs every show/hide decision (test harness aid).
+    private static let debugsPopup = ProcessInfo.processInfo.environment["SILL_DEBUG_POPUP"] != nil
     /// Puts the loading row up once a generator has run for 150ms — long
     /// enough that a spinner informs rather than flickers.
     private var loadingTimer: DispatchWorkItem?
@@ -68,6 +70,11 @@ final class CompletionController {
     // MARK: - Session events
 
     func bufferChanged(_ session: Session) {
+        if Self.debugsPopup {
+            NSLog("Sill popup: buf [%@] hist=%d active=%d front=%@", session.buffer,
+                  session.fromHistory ? 1 : 0, sessions.activeSession === session ? 1 : 0,
+                  NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "?")
+        }
         /* A recalled command is not something being typed toward: showing a
            list for its last word would catch the next arrow, which is meant
            for the command before it. Down until a keystroke changes the
@@ -88,6 +95,7 @@ final class CompletionController {
     }
 
     func lineEnded(_ session: Session) {
+        if Self.debugsPopup { NSLog("Sill popup: end") }
         xtermLineOrigin[session.sid] = nil   // the next prompt may be elsewhere
         xtermSettledRead[session.sid] = nil
         hide()
@@ -332,6 +340,10 @@ final class CompletionController {
     }
 
     private func present(_ suggestions: [Suggestion], for session: Session, loading: Bool = false) {
+        if Self.debugsPopup {
+            NSLog("Sill popup: present %d rows loading=%d for [%@]", suggestions.count,
+                  loading ? 1 : 0, session.buffer)
+        }
         /* A finished word — one suggestion left and it is exactly what has
            been typed — still shows: the row confirms the word is known (and
            says what it does), while Return runs the line through the popup
@@ -359,8 +371,17 @@ final class CompletionController {
     }
 
     private func hide() {
+        if Self.debugsPopup, popup.isVisible || !presented.isEmpty {
+            NSLog("Sill popup: hide")
+        }
         loadingTimer?.cancel()
         loadingTimer = nil
+        /* A generator still running for the buffer that was just abandoned
+           must not resurface: its answer would present against whatever the
+           session holds now — a line recalled from history, or nothing at
+           all after Return — for the instant until the next buffer arrives.
+           Advancing the generation drops any answer already in flight. */
+        generation += 1
         presented = []
         presentedPartial = nil
         presentedBuffer = nil

@@ -48,6 +48,7 @@ typeset -g _sill_sid="$$-${RANDOM}${RANDOM}"
 typeset -g _sill_dead=0        # connect failed this prompt; retry next precmd
 typeset -gi _sill_retry_at=0   # $SECONDS after which a keystroke may retry
 typeset -g _sill_last=""       # last sent buffer+cursor, for dedup
+typeset -g _sill_last_hist=""  # whether that send carried the history flag
 typeset -g _sill_popup=0       # the app's popup is on screen
 typeset -g _sill_nav=0         # user has arrow-navigated (gates Return)
 typeset -g _sill_exact=0       # highlighted item == what was typed (Return runs)
@@ -290,7 +291,7 @@ _sill_send_buf() {
         _sill_connect || return 0
         zle -F $_sill_fd _sill_reply_handler
         _sill_registered=1
-        _sill_last=""
+        _sill_last="" _sill_last_hist=""
     fi
     # The terminal was resized (a pane split, a window drag). The pane's new
     # size follows from the grid, and the cell size still holds — the font
@@ -325,9 +326,18 @@ _sill_send_buf() {
     # Inside ^R's search loop LASTWIDGET still names the widget before it;
     # the isearch hooks below keep this flag for the duration.
     (( _sill_in_isearch )) && hist=",\"hist\":true"
-    local state="$BUFFER"$'\x1f'"$CURSOR$hist"
-    [[ "$state" == "$_sill_last" ]] && return 0
+    local state="$BUFFER"$'\x1f'"$CURSOR"
+    if [[ "$state" == "$_sill_last" ]]; then
+        # Same text, same cursor: worth re-sending only when history has just
+        # put it here (the app takes the popup down for a recalled line).
+        # The flag dropping on its own is not news — Return redraws once
+        # more before zle-line-finish, with LASTWIDGET now accept-line, and
+        # re-sending the recalled line unflagged there showed the popup for
+        # a moment between Return and the line ending.
+        [[ -n "$hist" && -z "$_sill_last_hist" ]] || return 0
+    fi
     _sill_last=$state
+    _sill_last_hist=$hist
     # Only once there is a measurement to send: zeros would read as a grid
     # the app can't use, and it needs to tell "not yet" from "never".
     local grid=""
@@ -449,7 +459,7 @@ _sill_csi_sink() {
             _sill_col=$(( idx % COLUMNS + 1 ))
             [[ -f "$HOME/.sill-grid-debug" ]] && print -r -- \
                 "$(date +%T) ${TTY##*/} in-line report [$seq] cursor=$_sill_cpr_cursor cols=$COLUMNS buf=[$BUFFER] → anchor=$_sill_row,$_sill_col" >> /tmp/sill-grid.log
-            _sill_last=""
+            _sill_last="" _sill_last_hist=""
             _sill_send_buf
         fi
         return 0   # a report nobody asked for: a straggler, swallowed
@@ -598,7 +608,7 @@ _sill_line_init() {
         zle -F $_sill_fd _sill_reply_handler
         _sill_registered=1
     fi
-    _sill_last=""
+    _sill_last="" _sill_last_hist=""
     _sill_send_buf
 }
 
