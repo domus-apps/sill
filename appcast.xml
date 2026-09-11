@@ -587,5 +587,49 @@
         sparkle:edSignature="NRuXhoLxgVLEjmKWexiJ298pEpmEI/ky/M9m7zu8MAKFY/2L3HHYTcOZIShqOVoLQo+Fv5EiCPfyuJcd7pmEAQ==" length="3232875"
         type="application/octet-stream"/>
     </item>
+    <item>
+      <title>Sill v1.6.9</title>
+      <link>https://github.com/domus-apps/sill/releases/tag/v1.6.9</link>
+      <pubDate>Fri, 11 Sep 2026 05:50:47 +0000</pubDate>
+      <description xml:lang="en"><![CDATA[
+<h2>1.6.9</h2>
+<h3>Fixed</h3>
+<ul>
+<li>The app icon's background looked flat in the Dock and Finder. It now shows its gradient.</li>
+</ul>
+<h2>1.6.8</h2>
+<h3>Fixed</h3>
+<ul>
+<li>Fixed folder suggestions not appearing for a path such as <code class="notranslate">cd ../</code> after the previous update.</li>
+</ul>
+<h2>1.6.7</h2>
+<h3>Fixed</h3>
+<ul>
+<li>Fixed the popup flashing for a moment when pressing Return on a command recalled from history with the arrow keys.</li>
+</ul>      ]]></description>
+      <description xml:lang="ko"><![CDATA[
+<h2>1.6.9</h2>
+<h3>수정</h3>
+<ul>
+<li>Dock과 Finder에서 앱 아이콘 배경이 평면으로 보이던 문제를 고쳤습니다.</li>
+</ul>
+<h2>1.6.8</h2>
+<h3>수정</h3>
+<ul>
+<li>지난 업데이트 뒤 <code class="notranslate">cd ../</code>처럼 경로를 입력해도 폴더 목록이 나오지 않던 문제를 고쳤습니다.</li>
+</ul>
+<h2>1.6.7</h2>
+<h3>수정</h3>
+<ul>
+<li>방향키로 불러온 명령에서 Return을 누르면 팝업이 잠깐 나타났다 사라지던 문제를 고쳤습니다.</li>
+</ul>      ]]></description>
+      <sparkle:version>17</sparkle:version>
+      <sparkle:shortVersionString>1.6.9</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <enclosure
+        url="https://github.com/domus-apps/sill/releases/download/v1.6.9/Sill.zip"
+        sparkle:edSignature="6zMV7qW0kEMHHgOw8SptUF3JBE3jWvlSTBw32wfEb48vFJWPMioDT6DS7DYn3QmHqyJO1oLoj5rLeSo2orAMBQ==" length="3245614"
+        type="application/octet-stream"/>
+    </item>
   </channel>
 </rss>
