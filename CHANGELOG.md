@@ -4,6 +4,12 @@ All notable changes to Sill are documented here. The release workflow publishes 
 
 Keep each bullet on a single line: release notes render line breaks literally (both on GitHub and in the update dialog), so wrapped lines would break mid-sentence.
 
+## 1.6.10
+
+### Changed
+
+- The menu bar icon is now Sill's own: a prompt with a suggestion card, like the app icon.
+
 ## 1.6.9
 
 ### Fixed
