@@ -219,9 +219,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func setUpStatusItem() {
         // The same width every Domus app uses.
         let item = NSStatusBar.system.statusItem(withLength: 20)
-        item.button?.image = NSImage(
-            systemSymbolName: "rectangle.and.text.magnifyingglass",
-            accessibilityDescription: "Sill")
+        item.button?.image = MenuBarIcon.prompt()
         item.menu = buildMenu()
         statusItem = item
         updateStatusItemVisibility()
