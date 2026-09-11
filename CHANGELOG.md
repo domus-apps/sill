@@ -4,6 +4,12 @@ All notable changes to Sill are documented here. The release workflow publishes 
 
 Keep each bullet on a single line: release notes render line breaks literally (both on GitHub and in the update dialog), so wrapped lines would break mid-sentence.
 
+## 1.6.8
+
+### Fixed
+
+- Fixed folder suggestions not appearing for a path such as `cd ../` after the previous update.
+
 ## 1.6.7
 
 ### Fixed

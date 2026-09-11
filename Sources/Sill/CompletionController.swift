@@ -352,7 +352,7 @@ final class CompletionController {
         guard !suggestions.isEmpty || loading, sessions.activeSession === session,
               let placement = locateForPresent(session)
         else {
-            hide()
+            hide(discardingPending: false)
             return
         }
         presented = suggestions
@@ -370,18 +370,22 @@ final class CompletionController {
         sendPopupState()
     }
 
-    private func hide() {
+    /* `discardingPending`: whether a generator still running for the current
+       buffer is abandoned too. True for every hide that means "this line is
+       over or gone" — a history recall, Return, Esc, a lost session — where
+       a late answer would otherwise present against whatever the session
+       holds by then (the recalled line, or nothing at all after Return) for
+       the instant until the next buffer arrives. False while the buffer is
+       still being typed and there is simply nothing to show yet ("cd ../"
+       has no static rows, the folder listing is on its way), or when only
+       the placement was lost: the answer is still wanted. */
+    private func hide(discardingPending: Bool = true) {
         if Self.debugsPopup, popup.isVisible || !presented.isEmpty {
             NSLog("Sill popup: hide")
         }
         loadingTimer?.cancel()
         loadingTimer = nil
-        /* A generator still running for the buffer that was just abandoned
-           must not resurface: its answer would present against whatever the
-           session holds now — a line recalled from history, or nothing at
-           all after Return — for the instant until the next buffer arrives.
-           Advancing the generation drops any answer already in flight. */
-        generation += 1
+        if discardingPending { generation += 1 }
         presented = []
         presentedPartial = nil
         presentedBuffer = nil
@@ -405,7 +409,7 @@ final class CompletionController {
                   let now = CaretLocator.locate(for: session)
             else {
                 CaretLocator.debugLine("watchdog: hide — \(sessions.activeSession == nil ? "no active session" : "locate returned nil")")
-                hide()
+                hide(discardingPending: false)
                 return
             }
             // While typing runs ahead of VS Code's drawing, its reads trail
@@ -427,7 +431,7 @@ final class CompletionController {
             else {
                 CaretLocator.debugLine("watchdog: hide — now=\(Int(now.rect.minX)),\(Int(now.rect.minY)) precise=\(now.precise) shown=\(Int(shown.rect.minX)),\(Int(shown.rect.minY)) precise=\(shown.precise)")
                 xtermLineOrigin[session.sid] = nil
-                hide()
+                hide(discardingPending: false)
                 return
             }
             noteSettledRead(now, for: session)
