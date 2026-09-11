@@ -499,5 +499,49 @@
         sparkle:edSignature="o4Ou1Kj8poqf6Vweo1v1a2MQJa/UdwhB0Oa3+dg9xLidGE7Fc97vzzQfs8ky3IxdiXE+ThuKhT/1DrVmX+hIAQ==" length="3231671"
         type="application/octet-stream"/>
     </item>
+    <item>
+      <title>Sill v1.6.7</title>
+      <link>https://github.com/domus-apps/sill/releases/tag/v1.6.7</link>
+      <pubDate>Fri, 11 Sep 2026 00:34:48 +0000</pubDate>
+      <description xml:lang="en"><![CDATA[
+<h2>1.6.7</h2>
+<h3>Fixed</h3>
+<ul>
+<li>Fixed the popup flashing for a moment when pressing Return on a command recalled from history with the arrow keys.</li>
+</ul>
+<h2>1.6.6</h2>
+<h3>Fixed</h3>
+<ul>
+<li>Closing Settings or the welcome window now returns you to the app you were using, so other apps' shortcuts keep working right away.</li>
+</ul>
+<h2>1.6.5</h2>
+<h3>Changed</h3>
+<ul>
+<li>A command recalled from history with the arrow keys or ⌃R opens no popup, so the next arrow keeps moving through history. Typing on that line brings the popup back.</li>
+</ul>      ]]></description>
+      <description xml:lang="ko"><![CDATA[
+<h2>1.6.7</h2>
+<h3>수정</h3>
+<ul>
+<li>방향키로 불러온 명령에서 Return을 누르면 팝업이 잠깐 나타났다 사라지던 문제를 고쳤습니다.</li>
+</ul>
+<h2>1.6.6</h2>
+<h3>수정</h3>
+<ul>
+<li>설정 창이나 시작 안내 창을 닫으면 이전에 쓰던 앱으로 바로 돌아가, 다른 앱의 단축키가 곧바로 동작합니다.</li>
+</ul>
+<h2>1.6.5</h2>
+<h3>변경</h3>
+<ul>
+<li>방향키나 ⌃R로 히스토리에서 불러온 명령에는 팝업이 뜨지 않아, 이어서 누르는 방향키가 그대로 히스토리를 넘깁니다. 그 줄에 글자를 입력하면 팝업이 다시 나타납니다.</li>
+</ul>      ]]></description>
+      <sparkle:version>15</sparkle:version>
+      <sparkle:shortVersionString>1.6.7</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <enclosure
+        url="https://github.com/domus-apps/sill/releases/download/v1.6.7/Sill.zip"
+        sparkle:edSignature="4BccIKNjdc5sKCyIogH1M+4YrJojr14f+7XuMs3eMXHZ9xgf6Hi1ikF8n1snOiuRHooahGbdyzlcAUmgQhGXDA==" length="3232853"
+        type="application/octet-stream"/>
+    </item>
   </channel>
 </rss>
