@@ -542,18 +542,6 @@ savePNG(master, "Assets/icon-1024.png")
 try? fm.createDirectory(atPath: "Assets/AppIcon.icon/Assets", withIntermediateDirectories: true)
 savePNG(makeIconLayer(drawFlatGlyph), "Assets/AppIcon.icon/Assets/front.png")
 
-let bannerIcon = makeIcon(px: 728).cgImage!
-let banner = makeBitmap(1800, 600)
-withContext(banner) { drawBanner($0, icon: bannerIcon) }
-savePNG(banner, "Assets/banner.png")
-
-// GitHub social preview: exactly 1280x640, GitHub's recommended size.
-let og = makeBitmap(1280, 640)
-withContext(og) { cg in
-    drawSocialPreview(cg, icon: bannerIcon)
-}
-savePNG(og, "Assets/og-image.png")
-
 /* Keep the Icon Composer document's background in step with the icon's own
    gradient. macOS 26 renders the document (not the PNG above), and its
    single-color automatic-gradient came out nearly flat in the Dock, while
@@ -572,3 +560,79 @@ if let data = FileManager.default.contents(atPath: iconDocumentPath),
     try! (String(data: out, encoding: .utf8)! + "\n").write(toFile: iconDocumentPath, atomically: true, encoding: .utf8)
     print("wrote \(iconDocumentPath)")
 }
+
+/* The banner and social preview show the icon as macOS renders it — the
+   compiled Icon Composer document with the Liquid Glass treatment — rather
+   than the PNG drawn above, so they match the Dock, Finder, and the website
+   (which renders its icons the same way). The document is compiled with
+   actool into a throwaway stub bundle, unique per run so Launch Services
+   never hands back a cached icon of another app. Falls back to the PNG
+   render if actool is unavailable. */
+func systemRenderedIcon(px: Int) -> CGImage? {
+    let fm = FileManager.default
+    let slug = URL(fileURLWithPath: fm.currentDirectoryPath).lastPathComponent
+    let root = URL(fileURLWithPath: NSTemporaryDirectory())
+        .appendingPathComponent("domus-icon-\(slug)-\(ProcessInfo.processInfo.processIdentifier)")
+    defer { try? fm.removeItem(at: root) }
+    let compiled = root.appendingPathComponent("compiled")
+    let stub = root.appendingPathComponent("\(slug)-icon-preview.app")
+    let resources = stub.appendingPathComponent("Contents/Resources")
+    let executables = stub.appendingPathComponent("Contents/MacOS")
+    for dir in [compiled, resources, executables] {
+        try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
+    }
+
+    let actool = Process()
+    actool.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
+    actool.arguments = [
+        "actool", fm.currentDirectoryPath + "/Assets/AppIcon.icon",  // absolute: ibtoold caches by path
+        "--compile", compiled.path, "--app-icon", "AppIcon",
+        "--output-partial-info-plist", compiled.appendingPathComponent("partial.plist").path,
+        "--platform", "macosx", "--minimum-deployment-target", "26.0",
+        "--enable-on-demand-resources", "NO",
+    ]
+    actool.standardOutput = FileHandle.nullDevice
+    actool.standardError = FileHandle.nullDevice
+    guard (try? actool.run()) != nil else { return nil }
+    actool.waitUntilExit()
+    guard actool.terminationStatus == 0,
+          (try? fm.copyItem(at: compiled.appendingPathComponent("Assets.car"),
+                            to: resources.appendingPathComponent("Assets.car"))) != nil
+    else { return nil }
+    try? fm.copyItem(at: compiled.appendingPathComponent("AppIcon.icns"),
+                     to: resources.appendingPathComponent("AppIcon.icns"))
+
+    let info: [String: Any] = [
+        "CFBundleIdentifier": "com.jhaemin.\(slug).icon-preview", "CFBundleName": slug,
+        "CFBundlePackageType": "APPL", "CFBundleExecutable": "stub",
+        "CFBundleIconName": "AppIcon", "CFBundleIconFile": "AppIcon",
+    ]
+    let stubExecutable = executables.appendingPathComponent("stub")
+    guard let plist = try? PropertyListSerialization.data(fromPropertyList: info, format: .xml, options: 0),
+          (try? plist.write(to: stub.appendingPathComponent("Contents/Info.plist"))) != nil,
+          (try? "#!/bin/sh\n".write(to: stubExecutable, atomically: true, encoding: .utf8)) != nil
+    else { return nil }
+    try? fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: stubExecutable.path)
+
+    let icon = NSWorkspace.shared.icon(forFile: stub.path)
+    let rep = makeBitmap(px, px)
+    NSGraphicsContext.saveGraphicsState()
+    NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+    icon.draw(in: NSRect(x: 0, y: 0, width: px, height: px), from: .zero, operation: .copy, fraction: 1)
+    NSGraphicsContext.restoreGraphicsState()
+    return rep.cgImage
+}
+
+/* Rendered by macOS from the document just written (see systemRenderedIcon);
+   the PNG render is only the fallback. */
+let bannerIcon = systemRenderedIcon(px: 728) ?? makeIcon(px: 728).cgImage!
+let banner = makeBitmap(1800, 600)
+withContext(banner) { drawBanner($0, icon: bannerIcon) }
+savePNG(banner, "Assets/banner.png")
+
+// GitHub social preview: exactly 1280x640, GitHub's recommended size.
+let og = makeBitmap(1280, 640)
+withContext(og) { cg in
+    drawSocialPreview(cg, icon: bannerIcon)
+}
+savePNG(og, "Assets/og-image.png")
