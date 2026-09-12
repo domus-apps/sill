@@ -1,8 +1,10 @@
 #!/usr/bin/env swift
-// Generates the app icon (Assets/AppIcon.iconset/*.png + icon-1024.png) and
-// the README banner (Assets/banner.png) programmatically, so the artwork is
-// reproducible from source. Run: swift Scripts/make-assets.swift
-// Then:  iconutil -c icns Assets/AppIcon.iconset -o Assets/AppIcon.icns
+// Generates the Icon Composer document layers (Assets/AppIcon.icon), a still
+// of the icon as macOS renders it (Assets/icon-1024.png), the README banner
+// (Assets/banner.png) and the GitHub social preview (Assets/og-image.png)
+// programmatically, so the artwork is reproducible from source. The .icns the
+// app ships is actool's render of the same document (Scripts/bundle.sh).
+// Run: swift Scripts/make-assets.swift
 //
 // Styled after macOS Tahoe's Liquid Glass icon language, sibling to the other
 // Domus icons: the same continuous-curvature squircle, frosted-glass glyph
@@ -520,23 +522,6 @@ func drawSocialPreview(_ cg: CGContext, icon: CGImage) {
 // MARK: - Main
 
 let fm = FileManager.default
-try? fm.createDirectory(atPath: "Assets/AppIcon.iconset", withIntermediateDirectories: true)
-
-// Iconset: render each size directly from vectors (crisper than downscaling)
-let iconSizes: [(name: String, px: Int)] = [
-    ("icon_16x16", 16), ("icon_16x16@2x", 32),
-    ("icon_32x32", 32), ("icon_32x32@2x", 64),
-    ("icon_128x128", 128), ("icon_128x128@2x", 256),
-    ("icon_256x256", 256), ("icon_256x256@2x", 512),
-    ("icon_512x512", 512), ("icon_512x512@2x", 1024),
-]
-for (name, px) in iconSizes {
-    savePNG(makeIcon(px: px), "Assets/AppIcon.iconset/\(name).png")
-}
-
-let master = makeIcon(px: 1024)
-savePNG(master, "Assets/icon-1024.png")
-
 // Icon Composer layer for the macOS 26+ .icon document (front only — the
 // fill gradient in icon.json is the whole background)
 try? fm.createDirectory(atPath: "Assets/AppIcon.icon/Assets", withIntermediateDirectories: true)
@@ -561,14 +546,16 @@ if let data = FileManager.default.contents(atPath: iconDocumentPath),
     print("wrote \(iconDocumentPath)")
 }
 
-/* The banner and social preview show the icon as macOS renders it — the
-   compiled Icon Composer document with the Liquid Glass treatment — rather
-   than the PNG drawn above, so they match the Dock, Finder, and the website
-   (which renders its icons the same way). The document is compiled with
+/* The banner, the social preview, and icon-1024.png show the icon as macOS
+   renders it — the compiled Icon Composer document with the Liquid Glass
+   treatment — rather than the PNG drawn above, so they match the Dock,
+   Finder, and the website (which renders its icons the same way). The document is compiled with
    actool into a throwaway stub bundle, unique per run so Launch Services
-   never hands back a cached icon of another app. Falls back to the PNG
-   render if actool is unavailable. */
-func systemRenderedIcon(px: Int) -> CGImage? {
+   never hands back a cached icon of another app. Every requested size is
+   drawn while the stub still exists; nil (fall back to the PNG render) if
+   actool is unavailable. The .icns the app ships is actool's own render of
+   the same document (Scripts/bundle.sh), so none is generated here. */
+func systemRenderedIcon(sizes: [Int]) -> [Int: NSBitmapImageRep]? {
     let fm = FileManager.default
     let slug = URL(fileURLWithPath: fm.currentDirectoryPath).lastPathComponent
     let root = URL(fileURLWithPath: NSTemporaryDirectory())
@@ -615,17 +602,24 @@ func systemRenderedIcon(px: Int) -> CGImage? {
     try? fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: stubExecutable.path)
 
     let icon = NSWorkspace.shared.icon(forFile: stub.path)
-    let rep = makeBitmap(px, px)
-    NSGraphicsContext.saveGraphicsState()
-    NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
-    icon.draw(in: NSRect(x: 0, y: 0, width: px, height: px), from: .zero, operation: .copy, fraction: 1)
-    NSGraphicsContext.restoreGraphicsState()
-    return rep.cgImage
+    var rendered: [Int: NSBitmapImageRep] = [:]
+    for px in sizes {
+        let rep = makeBitmap(px, px)
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+        icon.draw(in: NSRect(x: 0, y: 0, width: px, height: px), from: .zero, operation: .copy, fraction: 1)
+        NSGraphicsContext.restoreGraphicsState()
+        rendered[px] = rep
+    }
+    return rendered
 }
 
 /* Rendered by macOS from the document just written (see systemRenderedIcon);
-   the PNG render is only the fallback. */
-let bannerIcon = systemRenderedIcon(px: 728) ?? makeIcon(px: 728).cgImage!
+   the PNG render is only the fallback. icon-1024.png is the repo's one
+   canonical still of the icon. */
+let systemIcon = systemRenderedIcon(sizes: [1024, 728])
+savePNG(systemIcon?[1024] ?? makeIcon(px: 1024), "Assets/icon-1024.png")
+let bannerIcon = (systemIcon?[728] ?? makeIcon(px: 728)).cgImage!
 let banner = makeBitmap(1800, 600)
 withContext(banner) { drawBanner($0, icon: bannerIcon) }
 savePNG(banner, "Assets/banner.png")
