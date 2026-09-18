@@ -675,5 +675,49 @@
         sparkle:edSignature="Zp3iAaWUPQ9RaXic1uPERHXqwBlP1y5HY/5Z7vxvz3PndcqkIyDjIysqRXUIxQdB/ir9TjztKI42TLt9IlmsCQ==" length="3246275"
         type="application/octet-stream"/>
     </item>
+    <item>
+      <title>Sill v1.6.11</title>
+      <link>https://github.com/domus-apps/sill/releases/tag/v1.6.11</link>
+      <pubDate>Fri, 18 Sep 2026 04:07:15 +0000</pubDate>
+      <description xml:lang="en"><![CDATA[
+<h2>1.6.11</h2>
+<h3>Fixed</h3>
+<ul>
+<li>The Settings window could no longer be dragged after a switch in it was flipped.</li>
+</ul>
+<h2>1.6.10</h2>
+<h3>Changed</h3>
+<ul>
+<li>The menu bar icon is now Sill's own: a prompt with a suggestion card, like the app icon.</li>
+</ul>
+<h2>1.6.9</h2>
+<h3>Fixed</h3>
+<ul>
+<li>The app icon's background looked flat in the Dock and Finder. It now shows its gradient.</li>
+</ul>      ]]></description>
+      <description xml:lang="ko"><![CDATA[
+<h2>1.6.11</h2>
+<h3>수정</h3>
+<ul>
+<li>설정 창의 스위치를 켜거나 끈 뒤 창을 끌어 옮길 수 없던 문제를 수정했습니다.</li>
+</ul>
+<h2>1.6.10</h2>
+<h3>변경</h3>
+<ul>
+<li>메뉴 막대 아이콘이 앱 아이콘과 같은 모양이 되었습니다. 프롬프트와 그 아래 추천 카드입니다.</li>
+</ul>
+<h2>1.6.9</h2>
+<h3>수정</h3>
+<ul>
+<li>Dock과 Finder에서 앱 아이콘 배경이 평면으로 보이던 문제를 고쳤습니다.</li>
+</ul>      ]]></description>
+      <sparkle:version>19</sparkle:version>
+      <sparkle:shortVersionString>1.6.11</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <enclosure
+        url="https://github.com/domus-apps/sill/releases/download/v1.6.11/Sill.zip"
+        sparkle:edSignature="vqKehX3fioiGPRgqu7jhp5+Tai0T5t2pwjuo9pxECDjvCjhxlwyhtYOjXHghgvYjxzjfzbLm9fDznJFclJJrDA==" length="3247247"
+        type="application/octet-stream"/>
+    </item>
   </channel>
 </rss>
