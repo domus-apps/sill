@@ -254,7 +254,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func updateActivationPolicy() {
         let needsDock = AppPreferences.isMenuBarIconHidden
             && settingsWindow?.window?.isVisible == true
-        NSApp.setActivationPolicy(needsDock ? .regular : .accessory)
+        let policy: NSApplication.ActivationPolicy = needsDock ? .regular : .accessory
+        guard NSApp.activationPolicy() != policy else { return }
+        NSApp.setActivationPolicy(policy)
+        /* Flipping the policy drops activation, and on macOS 27.2 (measured
+           2026-09-18) going back to accessory also leaves the Settings window
+           undraggable by its title bar until the app goes through a real
+           activation. That deactivation lands asynchronously, so the
+           re-activation has to wait — right away, the next run-loop turn or
+           didResignActive (~10 ms) are no-ops that leave the window stuck;
+           50 ms was borderline, 0.2 s and up always worked. */
+        guard settingsWindow?.window?.isVisible == true else { return }
+        if policy == .regular {
+            NSApp.activate(ignoringOtherApps: true)
+            settingsWindow?.window?.makeKeyAndOrderFront(nil)
+        } else {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                guard let self, settingsWindow?.window?.isVisible == true else { return }
+                NSApp.activate(ignoringOtherApps: true)
+                settingsWindow?.window?.makeKeyAndOrderFront(nil)
+            }
+        }
     }
 
     /* Accessory apps get no menu bar, but ⌘W/⌘Q should still work when a

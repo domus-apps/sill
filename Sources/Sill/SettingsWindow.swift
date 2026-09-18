@@ -31,7 +31,7 @@ final class SettingsWindowController: NSWindowController {
     init(updater: UpdaterController, specStore: SpecStore, derivedSpecs: DerivedSpecStore) {
         splitViewController = SettingsSplitViewController(
             updater: updater, specStore: specStore, derivedSpecs: derivedSpecs)
-        let window = NSWindow(contentViewController: splitViewController)
+        let window = SettingsWindow(contentViewController: splitViewController)
         window.styleMask = [.titled, .closable, .miniaturizable, .fullSizeContentView]
         /* A toolbar (even an empty one) is required for the full-height
            sidebar look. The tall unified style centers the traffic lights
@@ -58,6 +58,28 @@ final class SettingsWindowController: NSWindowController {
     @available(*, unavailable)
     required init?(coder: NSCoder) {
         fatalError("init(coder:) is not supported")
+    }
+}
+
+/* macOS 27.2 (26B5086k, measured 2026-09-18): clicking a SwiftUI switch
+   Toggle in this window twice leaves the window undraggable by its title bar
+   until the app relaunches. `isMovable` still reads true and the app still
+   receives the title-bar mouse events; the window server just stops moving
+   the window. It is the hosted NSSwitch (SwiftUI's Toggle, or any NSSwitch
+   inside an NSHostingView) — a bare AppKit NSSwitch and a checkbox Toggle
+   are fine. Re-asserting `isMovable` resyncs whatever the window server
+   dropped, and it has to happen before the drag's mouse-down (the server
+   decides at that moment; resetting inside the mouse-down is too late), so
+   every click in the window ends with a reset. The setter is cheap, and a
+   no-op when nothing is wrong. Verified 6/6 against a deterministic repro
+   in Keystone; the shell is shared, so every Domus app carries it. */
+final class SettingsWindow: NSWindow {
+    override func sendEvent(_ event: NSEvent) {
+        super.sendEvent(event)
+        if event.type == .leftMouseUp, isMovable {
+            isMovable = false
+            isMovable = true
+        }
     }
 }
 
