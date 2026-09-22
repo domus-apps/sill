@@ -9,20 +9,21 @@ enum MenuBarIcon {
     static func prompt() -> NSImage {
         let image = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { _ in
             /* Bigger and simpler than the icon: one row instead of two, and
-               the prompt thick enough to read at menu bar size. */
+               the strokes near SF Symbols' regular weight so it sits with
+               the system's own menu bar glyphs. */
             // Prompt chevron ">"
             let chevron = NSBezierPath()
             chevron.move(to: NSPoint(x: 3.4, y: 16))
             chevron.line(to: NSPoint(x: 6, y: 13.6))
             chevron.line(to: NSPoint(x: 3.4, y: 11.2))
-            chevron.lineWidth = 2
+            chevron.lineWidth = 1.5
             chevron.lineCapStyle = .round
             chevron.lineJoinStyle = .round
             chevron.stroke()
 
             // Block cursor
             NSBezierPath(
-                roundedRect: NSRect(x: 8.2, y: 11.2, width: 2.6, height: 4.8), xRadius: 0.6, yRadius: 0.6
+                roundedRect: NSRect(x: 8.5, y: 11.2, width: 2, height: 4.8), xRadius: 0.6, yRadius: 0.6
             ).fill()
 
             // Suggestion card: one outline with the notch pointing up at the cursor
@@ -42,13 +43,13 @@ enum MenuBarIcon {
             card.line(to: NSPoint(x: r.minX, y: r.maxY - c))
             card.appendArc(from: NSPoint(x: r.minX, y: r.maxY), to: NSPoint(x: r.minX + c, y: r.maxY), radius: c)
             card.close()
-            card.lineWidth = 1.6
+            card.lineWidth = 1.25
             card.lineJoinStyle = .round
             card.stroke()
 
             // The suggestion about to be taken
             NSBezierPath(
-                roundedRect: NSRect(x: 4.6, y: 4.1, width: 8.8, height: 1.8), xRadius: 0.9, yRadius: 0.9
+                roundedRect: NSRect(x: 4.6, y: 4.3, width: 8.8, height: 1.4), xRadius: 0.7, yRadius: 0.7
             ).fill()
             return true
         }

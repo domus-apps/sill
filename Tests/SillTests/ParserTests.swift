@@ -445,6 +445,23 @@ private struct FixedOverlays: OverlayProviding {
     #expect(slashed.first?.insertsNothing(before: "cd ../") == true)
     #expect(slashed.map(\.display).contains("sibling/"))
 
+    // "code ." — the current folder is exactly what was typed, so Return runs
+    // the line; "../" sits right under it for the arrow keys, then the
+    // hidden entries a leading dot asks for.
+    try FileManager.default.createDirectory(at: inner.appendingPathComponent(".hidden"),
+                                            withIntermediateDirectories: true)
+    let dot = TemplateResolver.suggestions(
+        templates: ["folders"], partial: Token(text: ".", typedLength: 1), cwd: inner.path)
+    #expect(dot.map(\.display) == ["./", "../", ".hidden/"])
+    #expect(dot[0].insertText == ".")
+    #expect(dot[0].insertsNothing(before: "code ."))
+
+    // "cd ./" — the folder itself on top, its contents under it.
+    let dotSlashed = TemplateResolver.suggestions(
+        templates: ["folders"], partial: Token(text: "./", typedLength: 2), cwd: root.path)
+    #expect(dotSlashed.map(\.display) == ["./", "inner/", "sibling/"])
+    #expect(dotSlashed.first?.insertsNothing(before: "cd ./") == true)
+
     // Deeper up-paths work the same way; a plain folder's slash does not.
     let twice = TemplateResolver.suggestions(
         templates: ["folders"], partial: Token(text: "../../", typedLength: 6), cwd: inner.path)

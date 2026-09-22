@@ -56,41 +56,45 @@ enum TemplateResolver {
         return withParentEntry(listed, partial: partial)
     }
 
-    /// Puts "../" on top of a path listing when the partial asks for it (see
-    /// `parentEntry`), unless the listing already has it.
+    /// Puts "./" and "../" on top of a path listing when the partial asks
+    /// for them (see `dotEntries`), skipping any the listing already has.
     static func withParentEntry(_ listing: [Suggestion], partial: Token) -> [Suggestion] {
-        guard let parent = parentEntry(partial: partial),
-              !listing.contains(where: { $0.display == parent.display })
-        else { return listing }
-        return [parent] + listing
+        let entries = dotEntries(partial: partial).filter { entry in
+            !listing.contains(where: { $0.display == entry.display })
+        }
+        return entries + listing
     }
 
-    /* ".." is a folder too, though no listing contains it. Typing "." or ".."
-       offers "../" like any other folder, and "../" typed through to the
-       slash lists the parent's folders with "../" itself on top — so that
-       Return there goes up (the item is exactly what was typed), while the
-       arrow keys still reach the folders inside. */
-    static func parentEntry(partial: Token) -> Suggestion? {
+    /* "." and ".." are folders too, though no listing contains them. Typing
+       "." offers "./" first — exactly what was typed, so Return runs the line
+       as is (`code .` opens the current folder) — with "../" right under it
+       for the arrow keys; ".." offers "../" alone. Either typed through to
+       the slash lists that folder with the typed path itself on top, so that
+       Return there goes where it says (`cd ../` goes up), while the arrow
+       keys still reach the folders inside. */
+    static func dotEntries(partial: Token) -> [Suggestion] {
         let text = partial.text
         let slash = text.lastIndex(of: "/")
         let directoryPrefix = slash.map { String(text[...$0]) } ?? ""
         let componentPrefix = slash.map { String(text[text.index(after: $0)...]) } ?? text
-        let display: String
-        let insertText: String
-        if componentPrefix == "." || componentPrefix == ".." {
-            display = directoryPrefix + "../"
-            insertText = shellEscaped(directoryPrefix + "..")
+        let paths: [String]
+        if componentPrefix == "." {
+            paths = [directoryPrefix + ".", directoryPrefix + ".."]
+        } else if componentPrefix == ".." {
+            paths = [directoryPrefix + ".."]
         } else if componentPrefix.isEmpty,
-                  directoryPrefix == "../" || directoryPrefix.hasSuffix("/../") {
-            display = directoryPrefix
-            insertText = shellEscaped(directoryPrefix)
+                  ["./", "../"].contains(where: { directoryPrefix == $0 || directoryPrefix.hasSuffix("/" + $0) }) {
+            paths = [directoryPrefix]
         } else {
-            return nil
+            return []
         }
-        let matched = Array(0..<min(partial.text.count, display.count))
-        return Suggestion(display: display, insertText: insertText, deleteCount: partial.typedLength,
-                          detail: "", kind: .folder, score: 5 * 1_000,  // the exact tier: what was typed, complete
-                          matchedOffsets: matched)
+        return paths.map { path in
+            let display = path.hasSuffix("/") ? path : path + "/"
+            let matched = Array(0..<min(text.count, display.count))
+            return Suggestion(display: display, insertText: shellEscaped(path), deleteCount: partial.typedLength,
+                              detail: "", kind: .folder, score: 5 * 1_000,  // the exact tier: what was typed, complete
+                              matchedOffsets: matched)
+        }
     }
 
     static func shellEscaped(_ value: String) -> String {
