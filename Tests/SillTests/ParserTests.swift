@@ -478,6 +478,59 @@ private struct FixedOverlays: OverlayProviding {
     #expect(TemplateResolver.withParentEntry(merged, partial: Token(text: "../", typedLength: 3)).count == 2)
 }
 
+@Test func homeRelativePathsKeepTheirTilde() throws {
+    let home = FileManager.default.temporaryDirectory
+        .appendingPathComponent("sill-home-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: home.appendingPathComponent("My Dev"),
+                                            withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: home) }
+
+    // "code ~/" lists the home folder; the tilde must stay bare or the shell
+    // reads it as a folder named "~". Names after it are escaped as usual.
+    #expect(TemplateResolver.shellEscapedPath("~/My Dev") == "~/My\\ Dev")
+    #expect(TemplateResolver.shellEscapedPath("src/~x") == "src/\\~x")
+    #expect(TemplateResolver.shellEscapedPath("=ls") == "\\=ls")
+    #expect(TemplateResolver.shellEscapedPath("a=b") == "a=b")
+    let listed = TemplateResolver.suggestions(
+        templates: ["filepaths"], partial: Token(text: "~/My", typedLength: 4), cwd: "/")
+    #expect(listed.isEmpty || listed.allSatisfy { $0.insertText.hasPrefix("~/") })
+    let absolute = TemplateResolver.suggestions(
+        templates: ["filepaths"], partial: Token(text: home.path + "/My", typedLength: home.path.count + 3), cwd: "/")
+    #expect(absolute.map(\.insertText) == [TemplateResolver.shellEscaped(home.path) + "/My\\ Dev"])
+}
+
+@Test func customGeneratorFileNamesAreEscaped() async {
+    // fig's filepaths generator hands each entry's raw name as its
+    // insertValue; a spec's own insertValue is typed as written.
+    let engine = SpecEngine()
+    let spec = """
+    var __sillSpec = { default: { name: "git", args: { generators: { custom: async () => [
+      { type: "folder", name: "My Dev/", insertValue: "My Dev/" },
+      { type: "file", name: "it's.txt", insertValue: "it's.txt" },
+      { type: "file", name: "=odd", insertValue: "=odd" },
+      { type: "folder", name: "plain/" },
+      { name: "quoted", insertValue: "'a b'" }
+    ] } } } };
+    """
+    let root = engine.evaluate(spec)!
+    let parser = CompletionParser(engine: SpyEngine(engine: engine, root: root))
+    let result = parser.complete(buffer: "git ", cursor: 4)
+    let pending = result.pendingArg!
+    let runner = GeneratorRunner()
+    let got: [Suggestion] = await withCheckedContinuation { done in
+        DispatchQueue.main.async {
+            runner.run(arg: pending.node, tokens: result.commandTokens, partial: pending.partial,
+                       cwd: NSTemporaryDirectory(), sid: "t") { done.resume(returning: $0) }
+        }
+    }
+    let inserts = Dictionary(uniqueKeysWithValues: got.map { ($0.display, $0.insertText) })
+    #expect(inserts["My Dev/"] == "My\\ Dev")
+    #expect(inserts["it's.txt"] == "it\\'s.txt")
+    #expect(inserts["=odd"] == "\\=odd")
+    #expect(inserts["plain/"] == "plain")
+    #expect(inserts["quoted"] == "'a b'")
+}
+
 // MARK: - Arrow keys at the ends of the list
 
 @Test func heldArrowStopsAtTheEndWhileATapWrapsRound() {

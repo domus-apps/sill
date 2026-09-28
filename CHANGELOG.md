@@ -4,6 +4,20 @@ All notable changes to Sill are documented here. The release workflow publishes 
 
 Keep each bullet on a single line: release notes render line breaks literally (both on GitHub and in the update dialog), so wrapped lines would break mid-sentence.
 
+## 1.8.0
+
+### Added
+
+- With "Complete command names" on, your zsh aliases appear alongside commands with what each one runs, as with `gco` for `git checkout`.
+- A simple alias keeps the completions of the command it stands for, so `gco ` lists your branches the same way `git checkout ` does.
+- Git aliases appear after `git`, and after an alias such as `g`, so `git co ` lists your branches when `co` is set to `checkout`.
+- Aliases appear in terminal tabs opened after this update.
+
+### Fixed
+
+- Choosing a path under `~/` inserted a stray backslash in front of it.
+- Folder and file names with spaces or quotes were inserted without escaping for some commands.
+
 ## 1.7.0
 
 ### Added

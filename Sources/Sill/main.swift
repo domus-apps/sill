@@ -12,11 +12,15 @@ if let index = CommandLine.arguments.firstIndex(of: "--complete"),
     }
     let derived = DerivedSpecStore()
     let engine = SpecEngine(specDirectories: directories, derived: derived)
-    let result = CompletionParser(
+    var parser = CompletionParser(
         engine: engine, commands: CommandCatalog(specDirectories: directories, derived: derived),
         overlays: derived)
-        .complete(buffer: buffer, cursor: buffer.count,
-                  searchPath: ProcessInfo.processInfo.environment["PATH"] ?? "")
+    if let tokens = parser.expandedShellTokens(of: buffer),
+       let context = GitAliasStore.Context(cwd: FileManager.default.currentDirectoryPath, tokens: tokens) {
+        parser.gitAliases = GitAliasStore.read(context)
+    }
+    let result = parser.complete(buffer: buffer, cursor: buffer.count,
+                                 searchPath: ProcessInfo.processInfo.environment["PATH"] ?? "")
     for s in result.suggestions {
         print("\(s.display)\t\(s.kind)\t\(s.detail.prefix(72))")
     }

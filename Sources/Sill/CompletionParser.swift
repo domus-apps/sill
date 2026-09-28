@@ -40,6 +40,8 @@ struct Token: Equatable {
     /// insertion must delete to replace it.
     var typedLength: Int
     var isSeparator: Bool = false
+    /// Quoting or escaping a command name suppresses zsh alias expansion.
+    var isQuoted: Bool = false
 }
 
 enum Tokenizer {
@@ -56,12 +58,14 @@ enum Tokenizer {
         var typed = 0
         var inWord = false
         var quote: Character? = nil
+        var isQuoted = false
 
         func flush() {
-            if inWord { tokens.append(Token(text: text, typedLength: typed)) }
+            if inWord { tokens.append(Token(text: text, typedLength: typed, isQuoted: isQuoted)) }
             text = ""
             typed = 0
             inWord = false
+            isQuoted = false
         }
 
         var iterator = input.makeIterator()
@@ -90,10 +94,12 @@ enum Tokenizer {
             case " ", "\t":
                 flush()
             case "'", "\"":
+                isQuoted = true
                 quote = ch
                 inWord = true
                 typed += 1
             case "\\":
+                isQuoted = true
                 inWord = true
                 typed += 1
                 if let next = lookahead {
@@ -196,6 +202,8 @@ struct CompletionParser {
     var commands: (any CommandCatalogProviding)? = nil
     /// Gaps in a spec, read from the command's own --help at each level.
     var overlays: (any OverlayProviding)? = nil
+    var shellAliases: [String: String] = [:]
+    var gitAliases: [String: String] = [:]
 
     /// The simple command under the caret: the rightmost command of a
     /// pipeline/list, minus leading environment assignments and wrappers
@@ -205,6 +213,11 @@ struct CompletionParser {
         if let lastSeparator = tokens.lastIndex(where: { $0.isSeparator }) {
             tokens = Array(tokens[(lastSeparator + 1)...])
         }
+        return unwrapped(tokens)
+    }
+
+    private static func unwrapped(_ input: [Token]) -> [Token] {
+        var tokens = input
         let wrappers: Set<String> = ["sudo", "env", "command", "builtin", "nohup", "time", "exec"]
         while let first = tokens.first, tokens.count > 1,
               first.text.contains("=") || wrappers.contains(first.text) {
@@ -213,17 +226,43 @@ struct CompletionParser {
         return tokens
     }
 
+    func expandedShellTokens(of prefix: String) -> [Token]? {
+        var tokens = Tokenizer.tokenize(prefix)
+        if let lastSeparator = tokens.lastIndex(where: { $0.isSeparator }) {
+            tokens = Array(tokens[(lastSeparator + 1)...])
+        }
+        guard let expanded = AliasExpansion.shell(tokens, aliases: shellAliases) else { return nil }
+        return Self.unwrapped(expanded)
+    }
+
     func complete(buffer: String, cursor: Int, searchPath: String = "") -> CompletionResult {
         let prefix = String(buffer.prefix(cursor))
-        var tokens = Self.commandTokens(of: prefix)
+        guard var tokens = expandedShellTokens(of: prefix) else {
+            return CompletionResult(suggestions: [])
+        }
 
         if tokens.count == 1 {
             return commandName(tokens[0], searchPath: searchPath)
         }
         guard tokens.count >= 2 else { return CompletionResult(suggestions: []) }
         let commandName = (tokens[0].text as NSString).lastPathComponent
+        let gitIndex = AliasExpansion.gitSubcommand(in: tokens)
+        let aliasRows = gitIndex == tokens.count - 1
+            ? aliasSuggestions(gitAliases, partial: tokens.last!, kind: .subcommand) : []
         guard let root = engine.spec(for: commandName) else {
+            if commandName == "git" {
+                return CompletionResult(suggestions: rank(aliasRows, partial: tokens.last!.text, command: "git"),
+                                        unknownCommand: tokens[0].text)
+            }
             return CompletionResult(suggestions: [], unknownCommand: tokens[0].text)
+        }
+
+        if commandName == "git" {
+            guard let expanded = AliasExpansion.git(tokens, aliases: gitAliases,
+                builtins: Set(root.subcommands.flatMap(\.names))) else {
+                return CompletionResult(suggestions: [])
+            }
+            tokens = expanded
         }
 
         let commandTokens = tokens.map(\.text)
@@ -336,6 +375,8 @@ struct CompletionParser {
             suggestions += overlaySuggestions(
                 overlays?.overlay(for: walked)?.subcommands ?? [], except: known,
                 partial: partial, kind: .subcommand)
+            let listed = Set(suggestions.map(\.display))
+            suggestions += aliasRows.filter { !listed.contains($0.display) }
         }
         let positional = node.args
         if argIndex < positional.count {
@@ -359,12 +400,27 @@ struct CompletionParser {
               !partial.text.contains("/"), !partial.text.contains("=")
         else { return CompletionResult(suggestions: []) }
         let suggestions = commands.commands(matching: partial.text, searchPath: searchPath)
+            .filter { shellAliases[$0.name] == nil || partial.isQuoted }
             .map { entry in
                 Suggestion(display: entry.name, insertText: entry.name,
                            deleteCount: partial.typedLength, detail: entry.description,
                            kind: .command)
             }
-        return CompletionResult(suggestions: rank(suggestions, partial: partial.text, command: ""))
+        let aliases = partial.isQuoted ? [] : aliasSuggestions(shellAliases, partial: partial, kind: .command)
+        return CompletionResult(suggestions: rank(suggestions + aliases, partial: partial.text, command: ""))
+    }
+
+    private func aliasSuggestions(_ aliases: [String: String], partial: Token,
+                                  kind: Suggestion.Kind) -> [Suggestion] {
+        aliases.compactMap { name, value in
+            let insertion = TemplateResolver.shellEscaped(name)
+            // Escaping a shell alias's name disables the alias itself.
+            guard !name.isEmpty, !name.contains(where: { $0.isNewline }),
+                  kind != .command || insertion == name else { return nil }
+            return Suggestion(display: name, insertText: insertion,
+                              deleteCount: partial.typedLength,
+                              detail: "→ " + value.replacingOccurrences(of: "\n", with: " "), kind: kind)
+        }
     }
 
     /// Rows for overlay entries whose names the spec doesn't already have.

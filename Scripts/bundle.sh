@@ -52,7 +52,9 @@ fi
 if [[ -n "${CODESIGN_IDENTITY:-}" ]]; then
     SIGN=(codesign --force --options runtime --timestamp --sign "$CODESIGN_IDENTITY")
 else
-    SIGN=(codesign --force --options runtime --sign -)
+    # Ad-hoc builds have no Team ID, so hardened runtime's library validation
+    # rejects the embedded Sparkle framework. Keep it for distribution only.
+    SIGN=(codesign --force --options 0 --sign -)
 fi
 
 # Sparkle's helpers must be signed individually, innermost first

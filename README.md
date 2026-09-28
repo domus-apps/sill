@@ -26,6 +26,19 @@ Dynamic suggestions (git branches, npm scripts) come from short shell
 commands the completion definitions specify, run locally in the session's
 working directory with a timeout.
 
+Aliases participate in completion too. With command-name completion enabled
+in Settings, ordinary zsh aliases appear with their definitions, including
+aliases loaded by `.zshrc` plugins or added in the current terminal. Alias
+changes are picked up at the next prompt. Git aliases appear after `git`
+(or a shell alias such as `g`); Git reads the applicable global, repository,
+and included config files, with a short cache refreshed as you type.
+Simple aliases retain argument completion: `gco='git checkout'` and Git's
+`co = checkout` both offer branches after the alias. Completion inserts the
+alias name itself. Compound shell aliases and Git `!` aliases are listed
+with their definitions, but their bodies are not evaluated for completion.
+Global/suffix zsh aliases and shell functions are not included. After
+updating Sill, open a new terminal tab to load the updated shell integration.
+
 The upstream corpus stopped updating in 2025, so Sill layers its own
 definitions on top ([Specs/overrides](Specs/overrides/README.md)) and, if you
 turn it on in Settings, learns commands the corpus doesn't know from their

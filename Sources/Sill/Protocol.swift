@@ -26,11 +26,13 @@ enum ShellMessage: Equatable {
     /// why steering lives here and not in an event tap.
     case key(sid: String, key: String)
     case end(sid: String)
+    /// Full snapshot of ordinary aliases active in this zsh session.
+    case aliases(sid: String, values: [String: String])
 
     var sid: String {
         switch self {
         case .hello(let sid, _, _, _, _, _), .buffer(let sid, _, _, _, _, _, _, _, _, _, _),
-             .key(let sid, _), .end(let sid):
+             .key(let sid, _), .end(let sid), .aliases(let sid, _):
             return sid
         }
     }
@@ -75,6 +77,9 @@ enum ShellMessage: Equatable {
             return .key(sid: sid, key: key)
         case "end":
             return .end(sid: sid)
+        case "aliases":
+            guard let values = dict["values"] as? [String: String] else { return nil }
+            return .aliases(sid: sid, values: values)
         default:
             return nil
         }

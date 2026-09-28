@@ -13,6 +13,7 @@ final class CompletionController {
     private let commandCatalog: CommandCatalog
     private var parser: CompletionParser
     private let generators = GeneratorRunner()
+    private let gitAliases = GitAliasStore()
     private let recency = RecencyStore()
     private let popup = PopupPanel()
     /// Command of the list on screen — the key recency is recorded under.
@@ -126,6 +127,16 @@ final class CompletionController {
 
         // First-word completion is a preference; honour it as of this keystroke.
         parser.commands = AppPreferences.completesCommandNames ? commandCatalog : nil
+        parser.shellAliases = session.aliases
+        parser.gitAliases = [:]
+        if let tokens = parser.expandedShellTokens(of: String(session.buffer.prefix(session.cursor))),
+           let context = GitAliasStore.Context(cwd: session.pwd, tokens: tokens) {
+            parser.gitAliases = gitAliases.aliases(in: context) { [weak self, weak session] in
+                guard let self, let session, self.generation == currentGeneration,
+                      self.sessions.activeSession === session else { return }
+                self.bufferChanged(session)
+            }
+        }
         let result = parser.complete(buffer: session.buffer, cursor: session.cursor,
                                      searchPath: session.searchPath)
         if AppPreferences.learnsFromHelp {

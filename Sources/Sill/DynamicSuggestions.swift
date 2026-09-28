@@ -37,7 +37,7 @@ enum TemplateResolver {
             let isDirectory =
                 (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
             if foldersOnly && !isDirectory { return nil }
-            let escaped = shellEscaped(directoryPrefix + name)
+            let escaped = shellEscapedPath(directoryPrefix + name)
             return Suggestion(
                 // The slash is shown, not typed: an insertion ends where the
                 // word ends, and a trailing "/" would change what rsync and
@@ -91,14 +91,24 @@ enum TemplateResolver {
         return paths.map { path in
             let display = path.hasSuffix("/") ? path : path + "/"
             let matched = Array(0..<min(text.count, display.count))
-            return Suggestion(display: display, insertText: shellEscaped(path), deleteCount: partial.typedLength,
+            return Suggestion(display: display, insertText: shellEscapedPath(path), deleteCount: partial.typedLength,
                               detail: "", kind: .folder, score: 5 * 1_000,  // the exact tier: what was typed, complete
                               matchedOffsets: matched)
         }
     }
 
+    /* A path typed from "~/" keeps its tilde bare: "\~/Dev" is a folder
+       named "~" to the shell, not the home folder. Everything after the
+       tilde is escaped as usual. */
+    static func shellEscapedPath(_ value: String) -> String {
+        guard value.hasPrefix("~") else { return shellEscaped(value) }
+        return "~" + shellEscaped(String(value.dropFirst()))
+    }
+
     static func shellEscaped(_ value: String) -> String {
-        var out = ""
+        // zsh turns a word starting with "=" into a command's path ("=ls"
+        // is /bin/ls); only the first character carries that meaning.
+        var out = value.hasPrefix("=") ? "\\" : ""
         for ch in value {
             if " \t\"'\\$`!*?[](){}<>;&|~#".contains(ch) { out.append("\\") }
             out.append(ch)
@@ -354,9 +364,18 @@ final class GeneratorRunner {
             let isFolder = type == "folder" || name.hasSuffix("/")
             let kind: Suggestion.Kind = isFolder ? .folder : (type == "file" ? .file : .argument)
             // A folder's own insertValue (fig's filepaths generator hands
-            // "src/") loses its slash the same way.
-            let insert = node.insertValue.map { Self.withoutTrailingSlash(CompletionParser.stripCursorMark($0)) }
-                ?? Self.insertion(for: name)
+            // "src/") loses its slash the same way. When that value is just
+            // the entry's own file name, as fig's filepaths hands it, it is
+            // raw: "My Dev/" typed as is is two words to the shell, so it is
+            // escaped like any listed path. A value a spec wrote differently
+            // is already in the shape to type and stays as written.
+            let insert: String
+            if let value = node.insertValue, !(kind != .argument && value == name) {
+                insert = Self.withoutTrailingSlash(CompletionParser.stripCursorMark(value))
+            } else {
+                insert = kind == .argument ? Self.insertion(for: name)
+                    : TemplateResolver.shellEscapedPath(Self.withoutTrailingSlash(name))
+            }
             suggestions.append(Suggestion(
                 display: name, insertText: insert, deleteCount: deleteCount,
                 detail: node.specDescription, kind: kind, priority: node.priority))

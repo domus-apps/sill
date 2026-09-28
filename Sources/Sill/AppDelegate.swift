@@ -94,6 +94,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if ProcessInfo.processInfo.environment["SILL_DEBUG_AUTOINSERT"] != nil {
                 NSLog("Sill: hello term=%@ dark=%@", term, dark.map { "\($0)" } ?? "unknown")
             }
+        case .aliases(let sid, let values):
+            guard let session = sessions[client], session.sid == sid else { return }
+            session.aliases = values
         case .buffer(_, let buf, let cur, let pwd, let row, let col, let cols, let rows,
                      let grid, let noGrid, let fromHistory):
             guard let session = sessions[client] else { return }

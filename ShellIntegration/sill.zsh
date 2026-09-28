@@ -20,6 +20,7 @@
 #     with CPR and XTWINOPS 16/14. Keys typed ahead of the prompt that the
 #     read swallows are handed back to ZLE at line-init.
 #   → {"t":"key","sid":…,"key":…}                (steering key while popup up)
+#   → {"t":"aliases","sid":…,"values":{…}}      (ordinary aliases, when changed)
 #   → {"t":"end","sid":…}                       (line accepted/aborted — hide)
 #   ← {"t":"insert","del":N,"text":…}            (replace the partial token)
 #   ← {"t":"popup","visible":…,"nav":…,"exact":…} (bind/unbind steering keys;
@@ -41,6 +42,8 @@ case "$TERM_PROGRAM" in
 esac
 
 zmodload zsh/net/socket 2>/dev/null || return 0
+# $aliases comes from zsh/parameter; without it only the alias sync is skipped.
+zmodload zsh/parameter 2>/dev/null
 autoload -Uz add-zle-hook-widget add-zsh-hook
 
 typeset -g _sill_fd=-1
@@ -49,6 +52,7 @@ typeset -g _sill_dead=0        # connect failed this prompt; retry next precmd
 typeset -gi _sill_retry_at=0   # $SECONDS after which a keystroke may retry
 typeset -g _sill_last=""       # last sent buffer+cursor, for dedup
 typeset -g _sill_last_hist=""  # whether that send carried the history flag
+typeset -g _sill_last_aliases=""  # signature of the aliases last sent
 typeset -g _sill_popup=0       # the app's popup is on screen
 typeset -g _sill_nav=0         # user has arrow-navigated (gates Return)
 typeset -g _sill_exact=0       # highlighted item == what was typed (Return runs)
@@ -239,7 +243,7 @@ _sill_parse_background() {
 
 # JSON string escaping in plain zsh: backslash first, then quote, then the
 # whitespace controls; any remaining C0 bytes are stripped.
-_sill_esc() {
+_sill_escape_reply() {
     local s=$1
     s=${s//\\/\\\\}
     s=${s//\"/\\\"}
@@ -247,7 +251,34 @@ _sill_esc() {
     s=${s//$'\t'/\\t}
     s=${s//$'\r'/\\r}
     s=${s//[[:cntrl:]]/}
-    print -rn -- "$s"
+    REPLY=$s
+}
+
+_sill_esc() {
+    _sill_escape_reply "$1"
+    print -rn -- "$REPLY"
+}
+
+# Serialize in-process: hundreds of aliases must not fork twice per entry.
+# Read live shell state after .zshrc and its sourced plugins have finished.
+# This runs at every prompt, so the change check comes first and is one
+# joined string built in C (well under a millisecond for a thousand
+# aliases); the JSON is only built when something changed.
+_sill_send_aliases() {
+    (( _sill_fd >= 0 && ${+aliases} )) || return 0
+    local signature="${(j:\0:)${(@kv)aliases}}"
+    [[ "$signature" == "$_sill_last_aliases" ]] && return 0
+    _sill_last_aliases=$signature
+    local name key value payload="" separator="" REPLY
+    for name in ${(ok)aliases}; do
+        _sill_escape_reply "$name"
+        key=$REPLY
+        _sill_escape_reply "${aliases[$name]}"
+        value=$REPLY
+        payload+="${separator}\"${key}\":\"${value}\""
+        separator=,
+    done
+    _sill_send "{\"t\":\"aliases\",\"sid\":\"$_sill_sid\",\"values\":{${payload}}}"
 }
 
 _sill_connect() {
@@ -261,6 +292,8 @@ _sill_connect() {
     print -u $_sill_fd -r -- \
         "{\"t\":\"hello\",\"v\":1,\"sid\":\"$_sill_sid\",\"pid\":$$,\"tty\":\"$(_sill_esc "$TTY")\",\"term\":\"$(_sill_esc "$TERM_PROGRAM")\"${_sill_dark:+,\"dark\":$_sill_dark},\"path\":\"$(_sill_esc "$PATH")\"}" \
         2>/dev/null || _sill_disconnect
+    _sill_last_aliases=""
+    _sill_send_aliases
 }
 
 _sill_disconnect() {
@@ -604,6 +637,7 @@ _sill_line_init() {
         _sill_typeahead=""
     fi
     _sill_connect
+    _sill_send_aliases
     if (( _sill_fd >= 0 && ! _sill_registered )); then
         zle -F $_sill_fd _sill_reply_handler
         _sill_registered=1
