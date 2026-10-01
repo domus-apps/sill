@@ -4,6 +4,17 @@ All notable changes to Sill are documented here. The release workflow publishes 
 
 Keep each bullet on a single line: release notes render line breaks literally (both on GitHub and in the update dialog), so wrapped lines would break mid-sentence.
 
+## 1.9.0
+
+### Added
+
+- With "Complete command names" on, commands you installed with Homebrew appear with their package's description.
+- With "Learn unknown commands from --help" on, a command's own zsh completion file fills in its subcommands and options.
+
+### Fixed
+
+- Commands installed while Sill was running did not appear until Sill was restarted.
+
 ## 1.8.0
 
 ### Added

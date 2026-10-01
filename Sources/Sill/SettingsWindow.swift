@@ -415,7 +415,7 @@ struct GeneralSettingsView: View {
                         isOn: model.binding({ AppPreferences.completesCommandNames },
                                             { AppPreferences.completesCommandNames = $0 })
                     )
-                    Text(L("Suggest the command itself from the first letter — installed commands Sill has definitions for, with what they do."))
+                    Text(L("Suggest the command itself from the first letter, with what it does. Includes commands Sill has definitions for and those you installed with Homebrew."))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -487,7 +487,7 @@ struct GeneralSettingsView: View {
                         isOn: model.binding({ AppPreferences.learnsFromHelp },
                                             { AppPreferences.learnsFromHelp = $0 })
                     )
-                    Text(L("Runs a command once with --help in the background to learn what its definition lacks, or all of it when there is none, and keeps that on this Mac. Real programs only — shell scripts are never run."))
+                    Text(L("Runs a command once with --help in the background to learn what its definition lacks, or all of it when there is none, and keeps that on this Mac. Shell scripts are never run. For those, Sill reads the zsh completion file installed with them."))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     HStack {

@@ -324,7 +324,7 @@ private struct FixedCatalog: CommandCatalogProviding {
     #expect(catalog.commands(matching: "c", searchPath: "/bin").map(\.name) == ["cd"])
     #expect(catalog.commands(matching: "f", searchPath: "/bin").isEmpty)   // defined, not installed
     #expect(catalog.commands(matching: "s", searchPath: "/bin").isEmpty)   // aws/s3 is not a command
-    #expect(CommandCatalog.scan("/bin").contains("ls"))
+    #expect(CommandCatalog.scan("/bin").names.contains("ls"))
 }
 
 // MARK: - Files and folders from the template resolver

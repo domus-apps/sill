@@ -20,7 +20,12 @@ import Foundation
    to a real Mach-O executable or an interpreter script whose interpreter
    is not a shell — a hand-written shell script may ignore its arguments and
    simply do its thing. Anything else is skipped, and remembered as skipped
-   until the file changes. */
+   until the file changes.
+
+   A program that can't be asked, or whose --help says nothing readable,
+   may still have a zsh completion file installed beside it (mole's `mo` is
+   a bash script, and Homebrew put `_mole` in site-functions). That file is
+   read as text, never run (ZshCompletion), and kept the same way. */
 final class DerivedSpecStore: OverlayProviding {
     /// Posted on the main queue after a file changed; userInfo["command"]
     /// names the root command, or is absent when everything was forgotten.
@@ -30,6 +35,10 @@ final class DerivedSpecStore: OverlayProviding {
     /// `cmd sub sub` is as deep as exploration goes (root included).
     static let maxDepth = 3
     static let timeout: TimeInterval = 2.5
+    /// Raised when learning can succeed where it used to fail, so a command
+    /// an older Sill recorded as skipped is tried once more.
+    /// 2: zsh completion files.
+    static let learner = 2
 
     private let queue = DispatchQueue(label: "sill.derive", qos: .utility)
     /// Keys (command, or "command sub …") being probed right now.
@@ -89,8 +98,9 @@ final class DerivedSpecStore: OverlayProviding {
         settled.insert(command)
         guard let executable = Self.resolve(command, searchPath: searchPath) else { return }
         let stamp = Self.stamp(of: executable)
-        if let existing = Self.loadObject(command), Self.sameStamp(Self.stamp(in: existing), stamp) {
-            return  // fresh — learned or deliberately skipped
+        if let existing = Self.loadObject(command), Self.sameStamp(Self.stamp(in: existing), stamp),
+           !Self.isFailed(existing) || Self.learner(of: existing) >= Self.learner {
+            return  // fresh — learned, or skipped by this Sill
         }
         inFlight.insert(command)
         queue.async { [weak self] in
@@ -267,16 +277,25 @@ final class DerivedSpecStore: OverlayProviding {
     private static func learn(command: String, executable: URL, stamp: [String: Any],
                               searchPath: String) -> String {
         if case .unsafe(let reason) = classify(executable) {
+            if let read = learnFromCompletionFile(command: command, executable: executable, stamp: stamp) {
+                return read
+            }
             write(failure(command: command, stamp: stamp, reason: reason), for: command)
             return "\(command): skipped — \(reason) (\(executable.path))"
         }
         guard let output = runHelp(executable, arguments: ["--help"], searchPath: searchPath) else {
+            if let read = learnFromCompletionFile(command: command, executable: executable, stamp: stamp) {
+                return read
+            }
             write(failure(command: command, stamp: stamp, reason: "no output from --help"),
                   for: command)
             return "\(command): --help produced nothing"
         }
         let spec = HelpParser.parse(output, command: command)
         guard !spec.isEmpty else {
+            if let read = learnFromCompletionFile(command: command, executable: executable, stamp: stamp) {
+                return read
+            }
             write(failure(command: command, stamp: stamp, reason: "help text not recognized"),
                   for: command)
             return "\(command): couldn't read options or commands out of --help"
@@ -285,6 +304,28 @@ final class DerivedSpecStore: OverlayProviding {
         object["_sill"] = stamp
         write(object, for: command)
         return "\(command): learned \(spec.options.count) options, \(spec.subcommands.count) subcommands"
+    }
+
+    /// The definition in the zsh completion file installed beside the
+    /// command, saved like a learned one; nil when there is none or nothing
+    /// in it could be read. Its subcommands come complete, so nothing is
+    /// explored (or run) later.
+    private static func learnFromCompletionFile(command: String, executable: URL,
+                                                stamp: [String: Any]) -> String? {
+        guard let file = ZshCompletion.file(for: command, executable: executable),
+              let size = (try? FileManager.default.attributesOfItem(atPath: file.path))?[.size] as? Int,
+              size < 2_000_000,
+              let source = try? String(contentsOf: file, encoding: .utf8),
+              var object = ZshCompletion.spec(source, command: command,
+                                              fileName: file.lastPathComponent)
+        else { return nil }
+        var meta = stamp
+        meta["completionFile"] = file.path
+        object["_sill"] = meta
+        write(object, for: command)
+        let options = (object["options"] as? [Any])?.count ?? 0
+        let subcommands = (object["subcommands"] as? [Any])?.count ?? 0
+        return "\(command): read \(options) options, \(subcommands) subcommands from \(file.path)"
     }
 
     private static func exploreNow(path: [String], executable: URL, searchPath: String) -> String {
@@ -487,7 +528,11 @@ final class DerivedSpecStore: OverlayProviding {
         let mtime = (attributes?[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
         let size = (attributes?[.size] as? NSNumber)?.intValue ?? 0
         return ["path": resolved.path, "mtime": mtime.rounded(), "size": size,
-                "generatedAt": Date().timeIntervalSince1970.rounded()]
+                "generatedAt": Date().timeIntervalSince1970.rounded(), "learner": learner]
+    }
+
+    private static func learner(of object: [String: Any]) -> Int {
+        (object["_sill"] as? [String: Any])?["learner"] as? Int ?? 1
     }
 
     private static func stamp(in object: [String: Any]) -> [String: Any]? {

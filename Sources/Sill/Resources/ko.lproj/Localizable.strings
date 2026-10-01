@@ -35,7 +35,7 @@
 "Adds one line to ~/.zshrc that streams what you type to Sill. New terminal tabs pick it up; ~/.zshrc is backed up first." = "~/.zshrc에 입력 내용을 Sill로 전달하는 한 줄을 추가합니다. 새 터미널 탭부터 적용되며, ~/.zshrc는 먼저 백업합니다.";
 "Available in the bundled app only — `swift run` has no bundle to source the script from." = "번들 앱에서만 사용할 수 있습니다. `swift run`에는 스크립트를 불러올 번들이 없습니다.";
 "Complete command names" = "명령 이름 자동완성";
-"Suggest the command itself from the first letter — installed commands Sill has definitions for, with what they do." = "첫 글자부터 명령 자체를 제안합니다. 설치되어 있고 Sill에 정의가 있는 명령을 설명과 함께 보여줍니다.";
+"Suggest the command itself from the first letter, with what it does. Includes commands Sill has definitions for and those you installed with Homebrew." = "첫 글자부터 명령 자체를 설명과 함께 제안합니다. Sill에 정의가 있는 명령과 Homebrew로 설치한 명령이 나옵니다.";
 "Grant…" = "허용…";
 "Needed only to position the popup at your cursor. Steering keys are handled by the shell integration." = "커서 위치에 팝업을 놓는 데만 필요합니다. 조작 키는 셸 통합이 처리합니다.";
 
@@ -48,7 +48,7 @@
 "Checked %@" = "%@ 확인함";
 "Definitions for hundreds of CLIs, from the open-source withfig/autocomplete project. Refreshed daily in the background." = "오픈 소스 withfig/autocomplete 프로젝트에서 가져온 수백 개 CLI의 정의입니다. 매일 백그라운드에서 갱신됩니다.";
 "Learn unknown commands from --help" = "모르는 명령은 --help로 익히기";
-"Runs a command once with --help in the background to learn what its definition lacks, or all of it when there is none, and keeps that on this Mac. Real programs only — shell scripts are never run." = "명령을 백그라운드에서 --help로 한 번 실행해 정의에 빠진 부분을, 정의가 없으면 전체를 익혀 이 Mac에 보관합니다. 실제 프로그램만 실행하며 셸 스크립트는 절대 실행하지 않습니다.";
+"Runs a command once with --help in the background to learn what its definition lacks, or all of it when there is none, and keeps that on this Mac. Shell scripts are never run. For those, Sill reads the zsh completion file installed with them." = "명령을 백그라운드에서 --help로 한 번 실행해 정의에 빠진 부분을, 정의가 없으면 전체를 익혀 이 Mac에 보관합니다. 셸 스크립트는 실행하지 않고, 함께 설치된 zsh 자동완성 파일을 읽어 익힙니다.";
 "Nothing learned yet" = "아직 익힌 명령 없음";
 "1 command learned" = "명령 1개 익힘";
 "%d commands learned" = "명령 %d개 익힘";

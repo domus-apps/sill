@@ -26,6 +26,12 @@ Dynamic suggestions (git branches, npm scripts) come from short shell
 commands the completion definitions specify, run locally in the session's
 working directory with a timeout.
 
+With command-name completion enabled in Settings, the first word offers the
+installed commands Sill has definitions for, plus the commands of Homebrew
+formulae you installed by name and of casks, each with its package's
+description. Commands a formula brought in as a dependency are left out.
+Sill reads Homebrew's install records for this and never runs `brew`.
+
 Aliases participate in completion too. With command-name completion enabled
 in Settings, ordinary zsh aliases appear with their definitions, including
 aliases loaded by `.zshrc` plugins or added in the current terminal. Alias
@@ -45,7 +51,11 @@ turn it on in Settings, learns commands the corpus doesn't know from their
 own `--help` output: the program is run once, in the background, with a
 quiet environment and a timeout, and what it prints is kept as a local
 definition on your Mac. Only real programs are run, a shell script found in
-your PATH is never executed for this.
+your PATH is never executed for this. For a shell script, or a program whose
+`--help` says nothing readable, Sill reads the zsh completion file installed
+next to it instead (Homebrew links these into `share/zsh/site-functions`).
+The file is read as text and never sourced, so lists it would only compute
+at completion time are left out.
 
 Steering keys (Tab, arrows, Return, Esc) are handled by the same shell
 integration, as line-editor bindings active only while the popup is on
