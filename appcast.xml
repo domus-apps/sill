@@ -839,5 +839,83 @@
         sparkle:edSignature="S7vfE5VOcT9nf8pA9kKwiosbEf9kum48LSAXd7TVWeq2sstOxDnG3Inl7FpswBWMTk+nWmGZ5c/wnuH7IozKAQ==" length="3270486"
         type="application/octet-stream"/>
     </item>
+    <item>
+      <title>Sill v1.9.0</title>
+      <link>https://github.com/domus-apps/sill/releases/tag/v1.9.0</link>
+      <pubDate>Thu, 01 Oct 2026 15:26:40 +0000</pubDate>
+      <description xml:lang="en"><![CDATA[
+<h2>1.9.0</h2>
+<h3>Added</h3>
+<ul>
+<li>With "Complete command names" on, commands you installed with Homebrew appear with their package's description.</li>
+<li>With "Learn unknown commands from --help" on, a command's own zsh completion file fills in its subcommands and options.</li>
+</ul>
+<h3>Fixed</h3>
+<ul>
+<li>Commands installed while Sill was running did not appear until Sill was restarted.</li>
+</ul>
+<h2>1.8.0</h2>
+<h3>Added</h3>
+<ul>
+<li>With "Complete command names" on, your zsh aliases appear alongside commands with what each one runs, as with <code class="notranslate">gco</code> for <code class="notranslate">git checkout</code>.</li>
+<li>A simple alias keeps the completions of the command it stands for, so <code class="notranslate">gco </code> lists your branches the same way <code class="notranslate">git checkout </code> does.</li>
+<li>Git aliases appear after <code class="notranslate">git</code>, and after an alias such as <code class="notranslate">g</code>, so <code class="notranslate">git co </code> lists your branches when <code class="notranslate">co</code> is set to <code class="notranslate">checkout</code>.</li>
+<li>Aliases appear in terminal tabs opened after this update.</li>
+</ul>
+<h3>Fixed</h3>
+<ul>
+<li>Choosing a path under <code class="notranslate">~/</code> inserted a stray backslash in front of it.</li>
+<li>Folder and file names with spaces or quotes were inserted without escaping for some commands.</li>
+</ul>
+<h2>1.7.0</h2>
+<h3>Added</h3>
+<ul>
+<li>Typing <code class="notranslate">.</code> offers <code class="notranslate">./</code> on top, so Return runs the line as typed.</li>
+</ul>
+<h3>Changed</h3>
+<ul>
+<li>The menu bar icon is drawn a little thinner, closer to the weight of the system's own icons.</li>
+</ul>      ]]></description>
+      <description xml:lang="ko"><![CDATA[
+<h2>1.9.0</h2>
+<h3>추가</h3>
+<ul>
+<li>"명령 이름 자동완성"을 켜면 Homebrew로 설치한 명령도 패키지 설명과 함께 목록에 뜹니다.</li>
+<li>"모르는 명령은 --help로 익히기"를 켜면 명령과 함께 설치된 zsh 자동완성 파일에서 하위 명령과 옵션을 익힙니다.</li>
+</ul>
+<h3>수정</h3>
+<ul>
+<li>Sill이 실행 중일 때 설치한 명령이 Sill을 다시 시작하기 전까지 목록에 뜨지 않았습니다.</li>
+</ul>
+<h2>1.8.0</h2>
+<h3>추가</h3>
+<ul>
+<li>"명령 이름 자동완성"을 켜면 zsh 별칭도 명령과 함께 뜨고, 각 별칭이 무엇을 실행하는지 보여 줍니다. <code class="notranslate">gco</code>에는 <code class="notranslate">git checkout</code>이 함께 보입니다.</li>
+<li>단순한 별칭은 원래 명령의 자동완성을 그대로 이어받아, <code class="notranslate">gco </code>에서도 <code class="notranslate">git checkout </code>처럼 브랜치 목록이 뜹니다.</li>
+<li>Git 별칭도 <code class="notranslate">git</code>이나 <code class="notranslate">g</code> 같은 별칭 뒤에 뜹니다. <code class="notranslate">co</code>를 <code class="notranslate">checkout</code>으로 설정해 두었다면 <code class="notranslate">git co </code>에서 브랜치 목록이 뜹니다.</li>
+<li>별칭은 이번 업데이트 뒤에 새로 연 터미널 탭부터 보입니다.</li>
+</ul>
+<h3>수정</h3>
+<ul>
+<li><code class="notranslate">~/</code> 아래 경로를 고르면 앞에 백슬래시가 붙던 문제를 고쳤습니다.</li>
+<li>일부 명령에서 공백이나 따옴표가 든 폴더·파일 이름이 이스케이프되지 않고 들어가던 문제를 고쳤습니다.</li>
+</ul>
+<h2>1.7.0</h2>
+<h3>추가</h3>
+<ul>
+<li><code class="notranslate">.</code>을 입력하면 <code class="notranslate">./</code>가 맨 위에 뜨고, 그대로 Return을 누르면 입력한 명령이 바로 실행됩니다.</li>
+</ul>
+<h3>변경</h3>
+<ul>
+<li>메뉴 막대 아이콘의 선을 살짝 가늘게 다듬어 다른 시스템 아이콘과 굵기를 맞췄습니다.</li>
+</ul>      ]]></description>
+      <sparkle:version>22</sparkle:version>
+      <sparkle:shortVersionString>1.9.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <enclosure
+        url="https://github.com/domus-apps/sill/releases/download/v1.9.0/Sill.zip"
+        sparkle:edSignature="BXZ/TAKjR3cubyqY91rOFaIDnhJpEhMrO7McDYaPsQ3KC9Ur+Ktu8Kp1Aiw7IQBkkCQTHnAuqoEz/AOzDmKGCQ==" length="3323666"
+        type="application/octet-stream"/>
+    </item>
   </channel>
 </rss>
