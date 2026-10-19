@@ -156,6 +156,7 @@ final class GeneratorRunner {
                 continue
             }
             group.enter()
+            let epoch = epochs[sid, default: 0]
             queue.async { [weak self] in
                 let output = Self.runShell(script, cwd: cwd)
                 DispatchQueue.main.async {
@@ -163,7 +164,7 @@ final class GeneratorRunner {
                     guard let self, let output else { return }
                     let suggestions = self.postProcess(
                         generator: generator, output: output, tokens: tokens, partial: partial)
-                    self.cache[key] = (Date(), suggestions)
+                    if self.epochs[sid, default: 0] == epoch { self.cache[key] = (Date(), suggestions) }
                     results += Self.matching(suggestions, query: partial.text)
                 }
             }
@@ -283,6 +284,21 @@ final class GeneratorRunner {
     }
     private var customCache: [CustomCacheKey: (token: String, suggestions: [Suggestion])] = [:]
 
+    /* Both caches last one line. Between lines the folder can change under
+       the same key: `git clone` or `mkdir` adds a folder, and the next
+       `cd ` listed what was there before, with no end to it, since
+       filepaths' trigger only fires when the token's directory changes. */
+    func forget(sid: String) {
+        cache = cache.filter { $0.key.sid != sid }
+        customCache = customCache.filter { $0.key.sid != sid }
+        epochs[sid, default: 0] += 1
+    }
+
+    /* Bumped by forget, so a run still going when its line ended (`cd `,
+       then Return before the listing came back) delivers its result but
+       doesn't put it back in the cache for the next line. */
+    private var epochs: [String: Int] = [:]
+
     private func runCustom(generator: JSValue, custom: JSValue, tokens: [String], partial: Token,
                            cwd: String, sid: String,
                            completion: @escaping ([Suggestion]) -> Void) {
@@ -313,10 +329,11 @@ final class GeneratorRunner {
             return completion([])
         }
 
+        let epoch = epochs[sid, default: 0]
         let finish: (JSValue) -> Void = { [weak self] value in
             guard let self else { return completion([]) }
             let suggestions = self.customSuggestions(from: value, deleteCount: deleteCount)
-            self.customCache[cacheKey] = (partial.text, suggestions)
+            if self.epochs[sid, default: 0] == epoch { self.customCache[cacheKey] = (partial.text, suggestions) }
             completion(Self.matching(suggestions, query: query))
         }
         if let then = result.objectForKeyedSubscript("then"), isFunction(then) {

@@ -99,10 +99,12 @@ final class CompletionController {
         if Self.debugsPopup { NSLog("Sill popup: end") }
         xtermLineOrigin[session.sid] = nil   // the next prompt may be elsewhere
         xtermSettledRead[session.sid] = nil
+        generators.forget(sid: session.sid)   // the next line lists folders afresh
         hide()
     }
 
     func sessionClosed(_ client: SocketServer.ClientID) {
+        if let session = sessions[client] { generators.forget(sid: session.sid) }
         if sessions.activeClient == client || popupClient == client { hide() }
     }
 

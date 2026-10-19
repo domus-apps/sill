@@ -27,6 +27,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         if TranslocationHealer.healIfNeeded() { return }
+        ShellIntegration.prepare()
         completions = CompletionController(
             sessions: sessions, server: server, specDirectories: Self.specDirectories,
             derived: derivedSpecs)

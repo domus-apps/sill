@@ -4,6 +4,17 @@ All notable changes to Sill are documented here. The release workflow publishes 
 
 Keep each bullet on a single line: release notes render line breaks literally (both on GitHub and in the update dialog), so wrapped lines would break mid-sentence.
 
+## 1.9.1
+
+### Changed
+
+- The line Sill adds to ~/.zshrc stays the same wherever Sill is installed.
+
+### Fixed
+
+- Sill stopped working in every terminal when the copy of Sill that first turned on shell integration was moved or deleted, until shell integration was turned off and on again.
+- Folders created or deleted after you completed a path in the same folder were not reflected until the terminal tab was reopened.
+
 ## 1.9.0
 
 ### Added
