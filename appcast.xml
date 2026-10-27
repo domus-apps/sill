@@ -997,5 +997,69 @@
         sparkle:edSignature="b6nzdkNY6pVciRie3qaIiyRRV2hOnXXdmIbiIxc/S0edGicgeKiLRSpM881Pg98iYy8OZ9+KdS63Y8EmfnrADg==" length="3334021"
         type="application/octet-stream"/>
     </item>
+    <item>
+      <title>Sill v1.10.0</title>
+      <link>https://github.com/domus-apps/sill/releases/tag/v1.10.0</link>
+      <pubDate>Tue, 27 Oct 2026 13:08:04 +0000</pubDate>
+      <description xml:lang="en"><![CDATA[
+<h2>1.10.0</h2>
+<h3>Added</h3>
+<ul>
+<li>With "Complete command names" on, functions you defined in your shell appear with the comment written above them.</li>
+</ul>
+<h2>1.9.1</h2>
+<h3>Changed</h3>
+<ul>
+<li>The line Sill adds to ~/.zshrc stays the same wherever Sill is installed.</li>
+</ul>
+<h3>Fixed</h3>
+<ul>
+<li>Sill stopped working in every terminal when the copy of Sill that first turned on shell integration was moved or deleted, until shell integration was turned off and on again.</li>
+<li>Folders created or deleted after you completed a path in the same folder were not reflected until the terminal tab was reopened.</li>
+</ul>
+<h2>1.9.0</h2>
+<h3>Added</h3>
+<ul>
+<li>With "Complete command names" on, commands you installed with Homebrew appear with their package's description.</li>
+<li>With "Learn unknown commands from --help" on, a command's own zsh completion file fills in its subcommands and options.</li>
+</ul>
+<h3>Fixed</h3>
+<ul>
+<li>Commands installed while Sill was running did not appear until Sill was restarted.</li>
+</ul>      ]]></description>
+      <description xml:lang="ko"><![CDATA[
+<h2>1.10.0</h2>
+<h3>추가</h3>
+<ul>
+<li>"명령 이름 자동완성"을 켜면 직접 만든 셸 함수도 그 위에 적어 둔 주석과 함께 목록에 뜹니다.</li>
+</ul>
+<h2>1.9.1</h2>
+<h3>변경</h3>
+<ul>
+<li>Sill이 ~/.zshrc에 추가하는 줄은 Sill을 어디에 설치하든 똑같습니다.</li>
+</ul>
+<h3>수정</h3>
+<ul>
+<li>셸 통합을 처음 켠 Sill을 옮기거나 지우면 모든 터미널에서 Sill이 동작하지 않고, 셸 통합을 껐다 켜야 다시 동작하던 문제를 고쳤습니다.</li>
+<li>같은 폴더에서 경로를 자동완성한 뒤에 새로 만들거나 지운 폴더가 터미널 탭을 다시 열 때까지 목록에 반영되지 않던 문제를 고쳤습니다.</li>
+</ul>
+<h2>1.9.0</h2>
+<h3>추가</h3>
+<ul>
+<li>"명령 이름 자동완성"을 켜면 Homebrew로 설치한 명령도 패키지 설명과 함께 목록에 뜹니다.</li>
+<li>"모르는 명령은 --help로 익히기"를 켜면 명령과 함께 설치된 zsh 자동완성 파일에서 하위 명령과 옵션을 익힙니다.</li>
+</ul>
+<h3>수정</h3>
+<ul>
+<li>Sill이 실행 중일 때 설치한 명령이 Sill을 다시 시작하기 전까지 목록에 뜨지 않았습니다.</li>
+</ul>      ]]></description>
+      <sparkle:version>26</sparkle:version>
+      <sparkle:shortVersionString>1.10.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <enclosure
+        url="https://github.com/domus-apps/sill/releases/download/v1.10.0/Sill.zip"
+        sparkle:edSignature="U8XAIp0xtyVoL/GEwg9wbNGAEw2j1POzR2K7Xj7BWNXGOsE35r8cCtLCGsuxoLygpbLREPPnJn4F1JLCOAvVDQ==" length="3336747"
+        type="application/octet-stream"/>
+    </item>
   </channel>
 </rss>
