@@ -24,6 +24,35 @@ private struct AliasTestCatalog: CommandCatalogProviding {
     #expect(parser.complete(buffer: "g ch", cursor: 4).suggestions.contains { $0.display == "checkout" })
 }
 
+@Test func shellFunctionsAreSuggestedAsCommandsOncePerName() {
+    var parser = makeParser()
+    parser.commands = AliasTestCatalog()
+    parser.shellAliases = ["gco": "git checkout"]
+    parser.shellFunctions = ["killport": "kill what listens on a port", "git": "", "gco": "", "Kp": ""]
+    let rows = parser.complete(buffer: "kill", cursor: 4).suggestions
+    #expect(rows.first?.display == "killport")
+    #expect(rows.first?.insertText == "killport")
+    #expect(rows.first?.deleteCount == 4)
+    #expect(rows.first?.detail == "kill what listens on a port")
+    let kp = parser.complete(buffer: "k", cursor: 1).suggestions.first { $0.display == "Kp" }
+    #expect(kp?.detail == L("Shell function"))
+    let g = parser.complete(buffer: "g", cursor: 1).suggestions
+    #expect(g.filter { $0.display == "git" }.count == 1)
+    #expect(g.first { $0.display == "git" }?.detail == "Version control")
+    #expect(g.filter { $0.display == "gco" }.count == 1)
+    // Quoting disables an alias, not a function.
+    #expect(parser.complete(buffer: "'kill", cursor: 5).suggestions.contains { $0.display == "killport" })
+    parser.commands = nil
+    #expect(parser.complete(buffer: "kill", cursor: 4).suggestions.isEmpty)
+}
+
+@Test func functionProtocolAcceptsSnapshotsAndRejectsMalformedNames() {
+    let message = ShellMessage.decode(Data(#"{"t":"functions","sid":"s","values":{"killport":"kill it","vp":""}}"#.utf8))
+    #expect(message == .functions(sid: "s", values: ["killport": "kill it", "vp": ""]))
+    #expect(message?.sid == "s")
+    #expect(ShellMessage.decode(Data(#"{"t":"functions","sid":"s","values":{"vp":1}}"#.utf8)) == nil)
+}
+
 @Test func shellAliasesExpandForArgumentsWithoutChangingTheReplacementRange() {
     var parser = makeParser()
     parser.shellAliases = ["g": "git", "gco": "g checkout", "gc": "git commit -m 'fixed message'",
@@ -177,5 +206,80 @@ private struct AliasTestCatalog: CommandCatalogProviding {
         .aliases(sid: "test", values: ["g": "git", "cm": "git commit -m \"hello\"\n# next\\line"]),
         .aliases(sid: "test", values: ["g": "git --no-pager", "cm": "git commit -m \"hello\"\n# next\\line"]),
         .aliases(sid: "test", values: [:]),
+    ])
+}
+
+@Test func zshFunctionSnapshotsKeepOnlyTheUsersFunctions() throws {
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    let script = try String(contentsOf: root.appendingPathComponent("ShellIntegration/sill.zsh"), encoding: .utf8)
+    let start = try #require(script.range(of: "_sill_escape_reply() {"))
+    let end = try #require(script.range(of: "_sill_connect() {"))
+    let fm = FileManager.default
+    let directory = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    let library = directory.appendingPathComponent("share/zsh/functions")
+    try fm.createDirectory(at: library, withIntermediateDirectories: true)
+    defer { try? fm.removeItem(at: directory) }
+    try "zlibrary() { :; }\n".write(to: library.appendingPathComponent("zlibrary.zsh"), atomically: true, encoding: .utf8)
+    try "theme_status() { :; }\n".write(to: directory.appendingPathComponent("plain.zsh-theme"), atomically: true, encoding: .utf8)
+    try """
+        # kill what listens on a port,
+        #   e.g. `killport 3000`
+        killport() { :; }
+
+        function bare { :; }
+        # A command and its namespace helpers.
+        tool() { :; }
+        tool_helper() { :; }
+        widget() { :; }
+        zle -N widget
+        hooked() { :; }
+        precmd_functions+=(hooked)
+        git_prompt_info() { :; }
+        prompt_dir() { :; }
+        myprompt() { :; }
+        """.write(to: directory.appendingPathComponent(".zshrc"), atomically: true, encoding: .utf8)
+    let functionsDirectory = directory.appendingPathComponent("zfunc")
+    try fm.createDirectory(at: functionsDirectory, withIntermediateDirectories: true)
+    try "#autoload\n# load it lazily\n:\n".write(to: functionsDirectory.appendingPathComponent("lazy"), atomically: true, encoding: .utf8)
+    try ":\n".write(to: library.appendingPathComponent("zlazy"), atomically: true, encoding: .utf8)
+    let harness = String(script[start.lowerBound..<end.lowerBound]) + #"""
+
+    zmodload zsh/parameter zsh/zle zsh/zleparameter
+    typeset -g _sill_fd=1 _sill_sid=test _sill_last_functions=''
+    typeset -gA _sill_function_notes
+    _sill_send() { print -r -- "$1" }
+    source "$1/share/zsh/functions/zlibrary.zsh"
+    source "$1/plain.zsh-theme"
+    source "$1/.zshrc"
+    fpath=("$1/zfunc" "$1/share/zsh/functions")
+    autoload -Uz lazy zlazy missing
+    _private() { :; }
+    precmd() { :; }
+    TRAPINT() { :; }
+    azhw:zle-line-init() { :; }
+    _sill_send_functions
+    _sill_send_functions
+    vp() { :; }
+    _sill_send_functions
+    unfunction killport vp
+    _sill_send_functions
+    """#
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/bin/zsh")
+    process.arguments = ["-dfc", harness, "zsh", directory.path]
+    let pipe = Pipe()
+    process.standardOutput = pipe
+    try process.run()
+    let data = pipe.fileHandleForReading.readDataToEndOfFile()
+    process.waitUntilExit()
+    #expect(process.terminationStatus == 0)
+    var framer = LineFramer()
+    let messages = framer.consume(data).compactMap(ShellMessage.decode)
+    let mine = ["killport": "kill what listens on a port, e.g. `killport 3000`", "bare": "",
+                "tool": "A command and its namespace helpers.", "lazy": "load it lazily", "myprompt": ""]
+    #expect(messages == [
+        .functions(sid: "test", values: mine),
+        .functions(sid: "test", values: mine.merging(["vp": ""]) { $1 }),
+        .functions(sid: "test", values: mine.filter { $0.key != "killport" }),
     ])
 }

@@ -4,6 +4,12 @@ All notable changes to Sill are documented here. The release workflow publishes 
 
 Keep each bullet on a single line: release notes render line breaks literally (both on GitHub and in the update dialog), so wrapped lines would break mid-sentence.
 
+## 1.10.0
+
+### Added
+
+- With "Complete command names" on, functions you defined in your shell appear with the comment written above them.
+
 ## 1.9.1
 
 ### Changed

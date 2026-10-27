@@ -73,3 +73,4 @@
 "Couldn't unpack the spec bundle" = "정의 번들을 풀 수 없습니다";
 "No internet connection" = "인터넷에 연결되어 있지 않습니다";
 "Update failed — see Console for details" = "업데이트 실패 — 자세한 내용은 콘솔을 확인하세요";
+"Shell function" = "셸 함수";

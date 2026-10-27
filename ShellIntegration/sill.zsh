@@ -21,6 +21,7 @@
 #     read swallows are handed back to ZLE at line-init.
 #   → {"t":"key","sid":…,"key":…}                (steering key while popup up)
 #   → {"t":"aliases","sid":…,"values":{…}}      (ordinary aliases, when changed)
+#   → {"t":"functions","sid":…,"values":{…}}    (the user's functions, when changed)
 #   → {"t":"end","sid":…}                       (line accepted/aborted — hide)
 #   ← {"t":"insert","del":N,"text":…}            (replace the partial token)
 #   ← {"t":"popup","visible":…,"nav":…,"exact":…} (bind/unbind steering keys;
@@ -42,7 +43,8 @@ case "$TERM_PROGRAM" in
 esac
 
 zmodload zsh/net/socket 2>/dev/null || return 0
-# $aliases comes from zsh/parameter; without it only the alias sync is skipped.
+# $aliases and $functions come from zsh/parameter; without it only their
+# sync is skipped.
 zmodload zsh/parameter 2>/dev/null
 autoload -Uz add-zle-hook-widget add-zsh-hook
 
@@ -53,6 +55,8 @@ typeset -gi _sill_retry_at=0   # $SECONDS after which a keystroke may retry
 typeset -g _sill_last=""       # last sent buffer+cursor, for dedup
 typeset -g _sill_last_hist=""  # whether that send carried the history flag
 typeset -g _sill_last_aliases=""  # signature of the aliases last sent
+typeset -g _sill_last_functions=""  # signature of the function names last sent
+typeset -gA _sill_function_notes   # name\0file → the comment above it, once read
 typeset -g _sill_popup=0       # the app's popup is on screen
 typeset -g _sill_nav=0         # user has arrow-navigated (gates Return)
 typeset -g _sill_exact=0       # highlighted item == what was typed (Return runs)
@@ -281,6 +285,95 @@ _sill_send_aliases() {
     _sill_send "{\"t\":\"aliases\",\"sid\":\"$_sill_sid\",\"values\":{${payload}}}"
 }
 
+# Functions are commands too (`killport 3000`), but most of $functions is
+# not meant to be typed: zsh's own library and compinit's helpers, the
+# system's /etc/zshrc* (Terminal's shell_session_*), completion
+# functions, ZLE widgets and hooks, prompt pieces, a framework's
+# internals (oh-my-zsh's lib/, nvm's nvm_* beside nvm). functions_source
+# (zsh 5.4+) names the file each came from; one autoload hasn't read yet,
+# or one loaded without a record, is looked up on $fpath instead. Each is
+# described by the comment right above its definition, as `# what it does`
+# reads in .zshrc. Same change check as the aliases.
+_sill_send_functions() {
+    # Asked through $parameters: expanding $functions itself, even for ${+…},
+    # prints every function's body (1.4 ms per prompt for 1,500 of them).
+    (( _sill_fd >= 0 && ${+parameters[functions]} )) || return 0
+    local signature="${(j:\0:)${(k)functions}}"
+    [[ "$signature" == "$_sill_last_functions" ]] && return 0
+    _sill_last_functions=$signature
+    setopt localoptions extendedglob
+    local -A skip origins
+    local name origin head
+    local -a found
+    for name in ${${(M)${(v)widgets}:#user:*}#user:} $precmd_functions $preexec_functions \
+        $chpwd_functions $periodic_functions $zshaddhistory_functions $zshexit_functions; do
+        skip[$name]=1
+    done
+    for name in ${(k)functions}; do
+        [[ -n ${skip[$name]} ]] && continue
+        case $name in
+            [_.+-]*|*:*|(*[_-]|)prompt([_-]*|)|TRAP*|precmd|preexec|chpwd|periodic|zshexit|zshaddhistory|\
+            zsh_directory_name|command_not_found_handler) continue ;;
+        esac
+        origin=${functions_source[$name]-}
+        if [[ -z $origin ]]; then
+            found=( ${^fpath}/$name(N) )
+            origin=${found[1]-}
+            [[ -z $origin && ${functions[$name]} == "builtin autoload -X"* ]] && continue
+        fi
+        [[ $origin == (/etc/*|*/share/zsh/*|*.zsh-theme) ]] && continue
+        [[ -n $ZSH && $origin == $ZSH/(lib/*|oh-my-zsh.sh) &&
+           $name != (take|mkcd|omz|d|clipcopy|clippaste|zsh_stats) ]] && continue
+        origins[$name]=$origin
+    done
+    for name in ${(k)origins}; do
+        head=${name%%[_-]*}
+        [[ $head != $name && -n ${origins[$name]} && ${origins[$head]-} == ${origins[$name]} ]] &&
+            unset "origins[$name]"
+    done
+    local payload="" separator="" REPLY key description pattern
+    local -a lines
+    local -i at first
+    # File by file, so a framework's big file is read once (splitting
+    # powerlevel10k's 9,500 lines alone takes 4 ms), and only for names
+    # not read before.
+    for origin in "${(@u)origins}"; do
+        lines=()
+        for name in ${(k)origins[(R)${(b)origin}]}; do
+            key="$name"$'\0'"$origin"
+            if (( ! ${+_sill_function_notes[$key]} )); then
+                if (( ! $#lines )) && [[ -f $origin && -r $origin ]]; then
+                    lines=( "${(@f)$(<$origin)}" )
+                fi
+                description=""
+                pattern="[[:space:]]#(function[[:space:]]##${(b)name}([[:space:]]*|)|(function[[:space:]]##|)${(b)name}[[:space:]]#\(\)*)"
+                (( $#lines )) && at=${lines[(I)$~pattern]} || at=0
+                first=1
+                # An autoload file is the body itself: its opening comment,
+                # past `#!`, `#compdef` and `#autoload` lines.
+                if (( ! at )) && [[ ${origin:t} == $name ]]; then
+                    at=1
+                    while [[ ${lines[at]} == ('#!'*|'#compdef'*|'#autoload'*) ]]; do (( at++ )); done
+                    first=at
+                    while [[ ${lines[at]} == [[:space:]]#\#* ]]; do (( at++ )); done
+                fi
+                while (( at > first )) && [[ ${lines[at-1]} == [[:space:]]#\#* ]]; do
+                    (( at-- ))
+                    REPLY=${${lines[at]##[[:space:]]#\##[[:space:]]#}%%[[:space:]]#}
+                    [[ -n $REPLY ]] && description="$REPLY${description:+ $description}"
+                done
+                _sill_function_notes[$key]=$description
+            fi
+            _sill_escape_reply "${_sill_function_notes[$key]}"
+            description=$REPLY
+            _sill_escape_reply "$name"
+            payload+="${separator}\"${REPLY}\":\"${description}\""
+            separator=,
+        done
+    done
+    _sill_send "{\"t\":\"functions\",\"sid\":\"$_sill_sid\",\"values\":{${payload}}}"
+}
+
 _sill_connect() {
     (( _sill_fd >= 0 )) && return 0
     (( _sill_dead )) && return 1
@@ -292,8 +385,9 @@ _sill_connect() {
     print -u $_sill_fd -r -- \
         "{\"t\":\"hello\",\"v\":1,\"sid\":\"$_sill_sid\",\"pid\":$$,\"tty\":\"$(_sill_esc "$TTY")\",\"term\":\"$(_sill_esc "$TERM_PROGRAM")\"${_sill_dark:+,\"dark\":$_sill_dark},\"path\":\"$(_sill_esc "$PATH")\"}" \
         2>/dev/null || _sill_disconnect
-    _sill_last_aliases=""
+    _sill_last_aliases="" _sill_last_functions=""
     _sill_send_aliases
+    _sill_send_functions
 }
 
 _sill_disconnect() {
@@ -638,6 +732,7 @@ _sill_line_init() {
     fi
     _sill_connect
     _sill_send_aliases
+    _sill_send_functions
     if (( _sill_fd >= 0 && ! _sill_registered )); then
         zle -F $_sill_fd _sill_reply_handler
         _sill_registered=1

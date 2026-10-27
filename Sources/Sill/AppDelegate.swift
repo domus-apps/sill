@@ -98,6 +98,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         case .aliases(let sid, let values):
             guard let session = sessions[client], session.sid == sid else { return }
             session.aliases = values
+        case .functions(let sid, let values):
+            guard let session = sessions[client], session.sid == sid else { return }
+            session.functions = values
         case .buffer(_, let buf, let cur, let pwd, let row, let col, let cols, let rows,
                      let grid, let noGrid, let fromHistory):
             guard let session = sessions[client] else { return }

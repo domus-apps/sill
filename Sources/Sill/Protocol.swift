@@ -28,11 +28,15 @@ enum ShellMessage: Equatable {
     case end(sid: String)
     /// Full snapshot of ordinary aliases active in this zsh session.
     case aliases(sid: String, values: [String: String])
+    /// Full snapshot of the user's own shell functions (see sill.zsh for
+    /// which of $functions count), each with the comment above its
+    /// definition ("" when there is none).
+    case functions(sid: String, values: [String: String])
 
     var sid: String {
         switch self {
         case .hello(let sid, _, _, _, _, _), .buffer(let sid, _, _, _, _, _, _, _, _, _, _),
-             .key(let sid, _), .end(let sid), .aliases(let sid, _):
+             .key(let sid, _), .end(let sid), .aliases(let sid, _), .functions(let sid, _):
             return sid
         }
     }
@@ -80,6 +84,9 @@ enum ShellMessage: Equatable {
         case "aliases":
             guard let values = dict["values"] as? [String: String] else { return nil }
             return .aliases(sid: sid, values: values)
+        case "functions":
+            guard let values = dict["values"] as? [String: String] else { return nil }
+            return .functions(sid: sid, values: values)
         default:
             return nil
         }

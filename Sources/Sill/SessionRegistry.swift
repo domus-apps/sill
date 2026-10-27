@@ -16,6 +16,7 @@ final class Session {
 
     var buffer = ""
     var aliases: [String: String] = [:]
+    var functions: [String: String] = [:]
     var cursor = 0
     /// The buffer came from history (an arrow recall, a ^R search), not
     /// from typing: the popup stays down until the next typed change.

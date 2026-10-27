@@ -130,6 +130,7 @@ final class CompletionController {
         // First-word completion is a preference; honour it as of this keystroke.
         parser.commands = AppPreferences.completesCommandNames ? commandCatalog : nil
         parser.shellAliases = session.aliases
+        parser.shellFunctions = session.functions
         parser.gitAliases = [:]
         if let tokens = parser.expandedShellTokens(of: String(session.buffer.prefix(session.cursor))),
            let context = GitAliasStore.Context(cwd: session.pwd, tokens: tokens) {

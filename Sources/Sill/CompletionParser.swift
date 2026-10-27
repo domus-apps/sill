@@ -203,6 +203,7 @@ struct CompletionParser {
     /// Gaps in a spec, read from the command's own --help at each level.
     var overlays: (any OverlayProviding)? = nil
     var shellAliases: [String: String] = [:]
+    var shellFunctions: [String: String] = [:]
     var gitAliases: [String: String] = [:]
 
     /// The simple command under the caret: the rightmost command of a
@@ -407,7 +408,18 @@ struct CompletionParser {
                            kind: .command)
             }
         let aliases = partial.isQuoted ? [] : aliasSuggestions(shellAliases, partial: partial, kind: .command)
-        return CompletionResult(suggestions: rank(suggestions + aliases, partial: partial.text, command: ""))
+        // The user's shell functions (`killport`): one row per name, so a
+        // function named like a command or an alias adds nothing.
+        let taken = Set(suggestions.map(\.display) + aliases.map(\.display))
+        let lower = partial.text.lowercased()
+        let functions = shellFunctions.compactMap { name, comment -> Suggestion? in
+            guard name.lowercased().hasPrefix(lower), !taken.contains(name),
+                  TemplateResolver.shellEscaped(name) == name else { return nil }
+            return Suggestion(display: name, insertText: name, deleteCount: partial.typedLength,
+                              detail: comment.isEmpty ? L("Shell function") : comment, kind: .command)
+        }
+        return CompletionResult(suggestions: rank(suggestions + aliases + functions,
+                                                  partial: partial.text, command: ""))
     }
 
     private func aliasSuggestions(_ aliases: [String: String], partial: Token,
