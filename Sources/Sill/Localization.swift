@@ -24,6 +24,17 @@ private let localizationBundle: Bundle = {
     return .module
 }()
 
+/* domus-apps.com in the user's language: the site's root, or /kr for
+   Korean. Of the system's preferred languages, the first the site has
+   wins (Japanese then Korean gets Korean, as Sill's own strings do).
+   Without forPreferences the call answered "en" even with Korean first. */
+var websiteURL: URL {
+    let language = Bundle.preferredLocalizations(
+        from: ["en", "ko"], forPreferences: Locale.preferredLanguages
+    ).first
+    return URL(string: language == "ko" ? "https://domus-apps.com/kr" : "https://domus-apps.com/")!
+}
+
 func L(_ key: String) -> String {
     NSLocalizedString(key, bundle: localizationBundle, comment: "")
 }

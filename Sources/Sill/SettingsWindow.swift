@@ -535,6 +535,9 @@ struct GeneralSettingsView: View {
                     CheckForUpdatesButton(updater: model.updater)
                         .fixedSize()   // its own width, not the row's remainder
                 }
+                Button(L("Domus Website")) {
+                    NSWorkspace.shared.open(websiteURL)
+                }
             }
         }
         .formStyle(.grouped)

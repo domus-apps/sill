@@ -146,6 +146,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Windows
 
+    private func makeWebsiteItem() -> NSMenuItem {
+        let item = NSMenuItem(
+            title: L("Domus Website"), action: #selector(openWebsite), keyEquivalent: "")
+        item.target = self
+        return item
+    }
+
+    @objc private func openWebsite() {
+        NSWorkspace.shared.open(websiteURL)
+    }
+
     @objc private func showSettings() {
         if settingsWindow == nil {
             settingsWindow = SettingsWindowController(updater: updater, specStore: specStore,
@@ -245,6 +256,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settingsItem.target = self
         menu.addItem(settingsItem)
         menu.addItem(updater.makeMenuItem())
+        menu.addItem(makeWebsiteItem())
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(
             title: L("Quit Sill"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
